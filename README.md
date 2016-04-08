@@ -10,7 +10,7 @@ python 2.7 https://www.python.org/download/releases/2.7/<br>
 hub https://github.com/github/hub<br>
 
 ## Install
-Use ```sudo cp prh.py /usr/bin/prh``` and ```chmod +e /usr/bin/prh``` to put the command in your path
+Use ```sudo cp prh.py /usr/bin/prh``` and ```chmod +x /usr/bin/prh``` to put the command in your path
 
 
 ## Options
