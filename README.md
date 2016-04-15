@@ -10,8 +10,8 @@ python 2.7 https://www.python.org/download/releases/2.7/<br>
 hub https://github.com/github/hub<br>
 
 ## Install
-Use install.sh by running
-```chmod +x install.sh & ./install.sh```
+Use install.sh by running<br>
+```chmod +x install.sh & ./install.sh```<br>
 you are good to go :)
 
 ## Options
