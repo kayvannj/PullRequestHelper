@@ -10,8 +10,9 @@ python 2.7 https://www.python.org/download/releases/2.7/<br>
 hub https://github.com/github/hub<br>
 
 ## Install
-Use ```sudo cp prh.py /usr/bin/prh``` and ```chmod +x /usr/bin/prh``` to put the command in your path
-
+Use install.sh by running
+```chmod +x install.sh & ./install.sh```
+you are good to go :)
 
 ## Options
 ```-b``` the new branch name for this PR<br>
