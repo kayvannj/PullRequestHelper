@@ -9,6 +9,8 @@ DEFAULT_COMMIT_MESSAGE = "Commit"
 DEFAULT_BRANCH_NAME = "prh_branch"
 DEFAULT_PR_TITLE = "PRH"
 DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
+debug_is_on = 0
+verbose_is_on = 0
 
 
 def run_command(command, output=0):
