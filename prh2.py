@@ -1,18 +1,30 @@
 #!/usr/bin/python
+"""Pull Request Helper
+
+Usage:
+  prh2.py child <branch_name> [<commit_message> <pr_title> <pr_body>]
+  prh2.py parent <branch_name> [<commit_message> <pr_title> <pr_body>]
+  prh2.py config
+  prh2.py (-h | --help)
+  prh2.py --version
+
+Options:
+  -h --help     Show this screen.
+  --version     Show version.
+  --add         Add files
+  -v --verbose  Verbose mode, you see all the command being run
+  -d            Debug mode, no action really takes place
+"""
+from docopt import docopt
 import subprocess
 import sys
-
-# user is on version branch
-# running prh -b "branch" -a <file 1> <file 2> <file 3> ...
 
 DEFAULT_COMMIT_MESSAGE = "Commit"
 DEFAULT_BRANCH_NAME = "prh_branch"
 DEFAULT_PR_TITLE = "PRH"
 DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
 global debug_is_on
-debug_is_on = 0
 global verbose_is_on
-verbose_is_on = 0
 
 
 def run_command(command, output=0):
@@ -47,12 +59,12 @@ def checkout(branch_name):
 
 def add_files(file_paths):
     command = ["git", "add"] + file_paths
-    return run_command(command)
+    run_command(command)
 
 
 def add_all():
     command = ["git", "add", "-A"]
-    return run_command(command)
+    run_command(command)
 
 
 def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
@@ -109,77 +121,63 @@ def cd(path):
     run_command(command)
 
 
-def add_changes(file_paths, is_add_all):
-    if is_add_all:
-        res = add_all()
-    elif file_paths:
-        res = add_files(file_paths)
-
-    if res:
-        print("No files to be added! Use -a <file path> to add files")
-        return -1
-
-
-def main():
-    child_branch_name = ""
-    pr_title = ""
-    pr_body = ""
+def main(arguments):
+    branch_name = arguments["<branch_name>"]
+    pr_title = arguments["pr_title"]
+    pr_body = arguments["pr_body"]
+    verbose_is_on = arguments["-v"] or arguments["--verbose"]
+    debug_is_on = arguments["-d"]
     file_paths = []
     # get main branch name
     parent_branch = ""
-    submodule = 0
+    # submodule = arguments["sub"]
     current_branch = get_current_branch()
-    is_add_all = False
-    if "-debug" in sys.argv or "-d" in sys.argv:
-        global debug_is_on
-        debug_is_on = 1
-    if "-v" in sys.argv:
-        global verbose_is_on
-        verbose_is_on = 1
-    if "-b" in sys.argv:
-        child_branch_name = sys.argv[sys.argv.index("-b") + 1]
+    is_add_all = True
 
-    if "-pb" in sys.argv:
-        pr_body = sys.argv[sys.argv.index("-pb") + 1]
+    # if submodule:
+    #     cd(get_submodule_name())
 
-    if "-pt" in sys.argv:
-        pr_title = sys.argv[sys.argv.index("-pt") + 1]
+    if arguments["parent"]:
+        push(get_current_branch())
+        pr_url = create_pull_request(parent_branch, pr_title, pr_body)
+        if pr_url[:4] == "http":
+            print(pr_url)
+            launch_browser(pr_url)
+        else:
+            print(pr_url)
+    elif arguments["child"]:
+        if not branch_name:
+            print("Useage: prh -b \"branch\" -a <file 1> <file 2> <file 3> ...")
+        elif not add_all and not file_paths:
+            print("No files to be added! Use -a <file path> to add files")
+        else:
+            try:
+                # create new branch
+                if branch_name:
+                    create_branch(branch_name)
 
-    if "-a" in sys.argv:
-        file_paths = sys.argv[sys.argv.index("-a") + 1:]
-    else:
-        is_add_all = True
+                if is_add_all:
+                    add_all()
+                elif file_paths:
+                    add_files(file_paths)
 
-    if "-upto" in sys.argv:
-        parent_branch = sys.argv[sys.argv.index("-upto") + 1]
+                if branch_name and (file_paths or is_add_all):
+                    commit()
+                    push(branch_name)
 
-    if "-sub" in sys.argv:
-        submodule = 1
+                pr_url = create_pull_request(current_branch, pr_title, pr_body)
+                if pr_url[:4] == "http":
+                    print("\nPull Request URL >>> " + pr_url + "\n")
+                    launch_browser(pr_url)
+                else:
+                    print(pr_url)
 
-    if submodule:
-        cd(get_submodule_name())
-    # find changes and commit them
+                checkout(current_branch)
 
-    if child_branch_name:
-        create_branch(child_branch_name)
-        target_branch_name = current_branch
-    else:
-        target_branch_name = parent_branch
-
-    # add and commit changes
-    add_changes(file_paths, is_add_all)
-    commit()
-    push(get_current_branch())
-    pr_url = create_pull_request(target_branch_name, pr_title, pr_body)
-    if pr_url[:4] == "http":
-        print(pr_url)
-        launch_browser(pr_url)
-    else:
-        print(pr_url)
-
-    checkout(current_branch)
+            except subprocess.CalledProcessError, e:
+                print("Sorry, Failed")
 
 
-if __name__ == "__main__":
-    main()
-    # print(get_status())
+if __name__ == '__main__':
+    arguments = docopt(__doc__, version='2.0')
+    main(arguments)
