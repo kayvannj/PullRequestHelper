@@ -131,9 +131,11 @@ def main():
     if "-debug" in sys.argv or "-d" in sys.argv:
         global debug_is_on
         debug_is_on = 1
+
     if "-v" in sys.argv:
         global verbose_is_on
         verbose_is_on = 1
+
     if "-b" in sys.argv:
         child_branch_name = sys.argv[sys.argv.index("-b") + 1]
 
