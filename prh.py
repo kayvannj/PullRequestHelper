@@ -13,8 +13,8 @@ DEFAULT_COMMIT_MESSAGE = "Commit"
 DEFAULT_BRANCH_NAME = "prh_branch"
 DEFAULT_PR_TITLE = "PRH"
 DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
-debug_is_on = 1 if "-debug" in sys.argv or "-d" in sys.argv else 0
-verbose_is_on = 1 if "-v" in sys.argv else 0
+debug_is_on = 0
+verbose_is_on = 0
 
 
 def run_command(command, output=0):
@@ -49,7 +49,12 @@ def checkout(branch_name):
 
 def add_files(file_paths):
     command = ["git", "add"] + file_paths
-    run_command(command)
+    return run_command(command)
+
+
+def add_all():
+    command = ["git", "add", "-A"]
+    return run_command(command)
 
 
 def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
@@ -78,7 +83,7 @@ def create_pull_request(main_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_
 def get_current_branch():
     branches = subprocess.check_output(["git", "branch"])
     for b in branches.split("\n"):
-        if (b[0] == "*"):
+        if b[0] == "*":
             current_branch = b.split(" ")[1]
             break
     return current_branch
@@ -108,8 +113,19 @@ def cd(path):
     run_command(command)
 
 
+def add_changes(file_paths, is_add_all):
+    if is_add_all:
+        res = add_all()
+    elif file_paths:
+        res = add_files(file_paths)
+
+    if res:
+        print("No files to be added! Use -a <file path> to add files")
+        return -1
+
+
 def main():
-    branch_name = ""
+    child_branch_name = ""
     pr_title = ""
     pr_body = ""
     file_paths = []
@@ -128,7 +144,7 @@ def main():
         verbose_is_on = 1
 
     if "-b" in sys.argv:
-        branch_name = sys.argv[sys.argv.index("-b") + 1]
+        child_branch_name = sys.argv[sys.argv.index("-b") + 1]
 
     if "-pb" in sys.argv:
         pr_body = sys.argv[sys.argv.index("-pb") + 1]
@@ -138,9 +154,11 @@ def main():
 
     if "-a" in sys.argv:
         file_paths = sys.argv[sys.argv.index("-a") + 1:]
+    else:
+        is_add_all = True
 
-    if "-parent" in sys.argv:
-        parent_branch = sys.argv[sys.argv.index("-parent") + 1]
+    if "-upto" in sys.argv:
+        parent_branch = sys.argv[sys.argv.index("-upto") + 1]
 
     if "-sub" in sys.argv:
         submodule = 1
@@ -150,6 +168,7 @@ def main():
 
     if submodule:
         cd(get_submodule_name())
+    # find changes and commit them
 
     if child_branch_name:
         create_branch(child_branch_name)
@@ -163,38 +182,16 @@ def main():
     # add and commit changes
     add_changes(file_paths, is_add_all)
     commit(commit_message)
+
     push(get_current_branch())
     pr_url = create_pull_request(target_branch_name, pr_title, pr_body)
     if pr_url[:4] == "http":
         print(pr_url)
         launch_browser(pr_url)
     else:
-        if not branch_name:
-            print("Useage: prh -b \"branch\" -a <file 1> <file 2> <file 3> ...")
-        elif not file_paths:
-            print("No files to be added! Use -a <file path> to add files")
-        else:
-            try:
-                # create new branch
-                if branch_name:
-                    create_branch(branch_name)
+        print(pr_url)
 
-                if file_paths:
-                    add_files(file_paths)
-
-                if branch_name and file_paths:
-                    commit()
-                    push(branch_name)
-
-                pr_url = create_pull_request(current_branch, pr_title, pr_body)
-                if pr_url:
-                    print("\nPull Request URL >>> " + pr_url + "\n")
-                    launch_browser(pr_url)
-
-                checkout(current_branch)
-
-            except subprocess.CalledProcessError, e:
-                print("Sorry, Failed")
+    checkout(current_branch)
 
 
 if __name__ == "__main__":
