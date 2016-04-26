@@ -4,7 +4,11 @@ import sys
 
 # user is on version branch
 # running prh -b "branch" -a <file 1> <file 2> <file 3> ...
+USEAGE = """
+    prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]
+    prh -upto <parent_branch_name>
 
+"""
 DEFAULT_COMMIT_MESSAGE = "Commit"
 DEFAULT_BRANCH_NAME = "prh_branch"
 DEFAULT_PR_TITLE = "PRH"
@@ -54,6 +58,8 @@ def add_all():
 
 
 def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
+    if not commit_message:
+        commit_message = DEFAULT_COMMIT_MESSAGE
     command = ["git", "commit", "-m", commit_message]
     run_command(command)
 
@@ -65,7 +71,7 @@ def push(branch_name):
 
 def create_pull_request(main_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_PR_BODY):
     if not pr_title:
-        pr_title = DEFAULT_PR_TITLE
+        pr_title = get_current_branch().replace("_"," ")
     if not pr_body:
         pr_body = DEFAULT_PR_BODY
     else:
@@ -125,6 +131,7 @@ def main():
     file_paths = []
     # get main branch name
     parent_branch = ""
+    commit_message = ""
     submodule = 0
     current_branch = get_current_branch()
     is_add_all = False
@@ -156,6 +163,9 @@ def main():
     if "-sub" in sys.argv:
         submodule = 1
 
+    if "-m" in sys.argv:
+        commit_message = sys.argv[sys.argv.index("-m") + 1:]
+
     if submodule:
         cd(get_submodule_name())
     # find changes and commit them
@@ -163,12 +173,16 @@ def main():
     if child_branch_name:
         create_branch(child_branch_name)
         target_branch_name = current_branch
-    else:
+    elif parent_branch:
         target_branch_name = parent_branch
+    else:
+        print "Use -h to see the usage"
+        return
 
     # add and commit changes
     add_changes(file_paths, is_add_all)
-    commit()
+    commit(commit_message)
+
     push(get_current_branch())
     pr_url = create_pull_request(target_branch_name, pr_title, pr_body)
     if pr_url[:4] == "http":
