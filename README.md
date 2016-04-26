@@ -11,9 +11,9 @@ hub https://github.com/github/hub<br>
 
 ## Install
 Use install.sh by running<br>
-```chmod +x install.sh & ./install.sh```<br>
+```chmod +x install.sh```<br>
+```./install.sh <github username> <github token>```
 you are good to go :)
 
 ## Options
 ```-b``` the new branch name for this PR<br>
-```-a``` to add changed files to the branch and incloud in the PR
