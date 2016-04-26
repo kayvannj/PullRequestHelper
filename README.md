@@ -10,9 +10,12 @@ python 2.7 https://www.python.org/download/releases/2.7/<br>
 hub https://github.com/github/hub<br>
 
 ## Install
-Use install.sh by running<br>
-```chmod +x install.sh```<br>
-```./install.sh <github username> <github token>```
+```bash
+git clone git@github.com:kayvannj/PullRequestHelper.git
+cd PullRequestHelper
+chmod +x install.sh
+sudo ./install.sh <github-username> <github-token>
+```
 you are good to go :)
 
 ## Options
