@@ -11,6 +11,17 @@ USEAGE = """
     prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]
     2) when you are in a child branch and want to just make a PR to a specific parent branch
     prh -upto <parent_branch_name>
+
+    if -a  is not used, prh will add all the changed files using 'git add -A'
+
+    -a  to add only specified file into the PR
+    -m  to add a comment message
+    -pt to customize the PullRequest Title
+    -pb to append a message to the PullRequest body
+    -d  run in debug mode which means not executing commands and just printing them
+    -v  run in verbose mode
+    -h  show help
+    --version print the version of the app
 """
 DEFAULT_COMMIT_MESSAGE = "Commit"
 DEFAULT_BRANCH_NAME = "prh_branch"
