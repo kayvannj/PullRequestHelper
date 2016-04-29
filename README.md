@@ -18,6 +18,11 @@ python 2.7 https://www.python.org/download/releases/2.7/<br>
 hub https://github.com/github/hub<br>
 
 ## Install
+
+Create a github token if you don't have already with following permissions:
+![permissions](\permissions.png)
+
+then run the following commands
 ```bash
 git clone git@github.com:kayvannj/PullRequestHelper.git
 cd PullRequestHelper
