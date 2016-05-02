@@ -87,14 +87,14 @@ def push(branch_name):
     return not run_command(command,1)
 
 
-def create_pull_request(main_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_PR_BODY):
+def create_pull_request(from_branch, to_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_PR_BODY):
     if not pr_title:
         pr_title = get_current_branch().replace("_"," ")
     if not pr_body:
         pr_body = DEFAULT_PR_BODY
     else:
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
-    command = ["hub", "pull-request", "-b", main_branch, "-m", pr_title + "\n" + pr_body]
+    command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
     return run_command(command, 1)
 
 
@@ -156,7 +156,7 @@ def main():
     parent_branch = ""
     commit_message = ""
     submodule = 0
-    current_branch = get_current_branch()
+    original_branch = get_current_branch()
     is_add_all = False
     if "--version" in sys.argv:
         print "1.0.1"
@@ -199,7 +199,7 @@ def main():
 
     if child_branch_name:
         create_branch(child_branch_name)
-        target_branch_name = current_branch
+        target_branch_name = original_branch
     elif parent_branch:
         target_branch_name = parent_branch
     else:
@@ -211,8 +211,8 @@ def main():
     commit(commit_message)
 
     # push the branch
-    push(current_branch)
-    pr_url = create_pull_request(target_branch_name, pr_title, pr_body)
+    push(get_current_branch())
+    pr_url = create_pull_request(get_current_branch(), target_branch_name, pr_title, pr_body)
     if pr_url[:4] == "http":
         print(pr_url)
         launch_browser(pr_url)
