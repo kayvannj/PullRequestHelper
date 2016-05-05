@@ -164,7 +164,7 @@ def create_pull_request(from_branch, to_branch, pr_title=DEFAULT_PR_TITLE, pr_bo
     command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
     pr_url = run_command(command, 1)
 
-    if pr_url and pr_url[:4] == "http":
+    if pr_url and str(pr_url)[:4] == "http":
         print(pr_url)
         launch_browser(pr_url)
         return 0
