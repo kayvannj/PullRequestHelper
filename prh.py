@@ -8,11 +8,11 @@ import sys
 USEAGE = """
     You can use prh in three main ways:<br>
     1) create a pr from a new branch to current branch
-        ```prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]```
+        prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]
     2) create a pr from current branch to a different branch
-        ```prh -upto <parent_branch_name>```
+        prh -upto <parent_branch_name>
     3) create a pr from a new branch to a different branch
-        ```prh -b <child_branch_name> -upto <parent_branch_name>```
+        prh -b <child_branch_name> -upto <parent_branch_name>
 
 
     if -a  is not used, prh will add all the changed files using 'git add -A'
