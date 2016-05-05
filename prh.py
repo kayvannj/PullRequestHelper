@@ -30,34 +30,34 @@ DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
 debug_is_on = 0
 verbose_is_on = 0
 
+
 def run_command(command, output=0):
+    """
+    run the given command
+    :param command:
+    :param output:
+    :return: 0 if no error occurs or the error code
+    """
     if debug_is_on:
         print_command(command)
+        return 0
     else:
         if verbose_is_on:
             print command
-
         try:
             if output:
-                return subprocess.check_output(command)
+                run_output = subprocess.check_output(command)
             else:
-                return subprocess.check_call(command)
+                run_output = subprocess.check_call(command)
+            if verbose_is_on:
+                print "\nOUTPUT:\t" + str(run_output) + "\n"
+            return run_output
         except subprocess.CalledProcessError as e:
-            return e.output
-
-
+            return e.returncode
 
 
 def print_command(command):
-    print reduce(lambda x, y: x + " " + y, command)
-
-
-def create_branch(branch_name):
-    command = ["git", "checkout", "-b", branch_name]
-    res = run_command(command)
-    if res and "already exists" in res:
-        print branch_name+" branch already exists"
-        checkout(branch_name)
+    print get_current_branch() + " >>> " + reduce(lambda x, y: x + " " + y, command)
 
 
 def checkout(branch_name):
@@ -67,47 +67,18 @@ def checkout(branch_name):
 
 def add_files(file_paths):
     command = ["git", "add"] + file_paths
-    return run_command(command,1)
+    return run_command(command, 1)
 
 
 def add_all():
     command = ["git", "add", "-A"]
-    return run_command(command,1)
-
-
-def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
-    if not commit_message:
-        commit_message = DEFAULT_COMMIT_MESSAGE
-    command = ["git", "commit", "-m", commit_message]
-    run_command(command)
-
-
-def push(branch_name):
-    command = ["git", "push", "--set-upstream", "origin", branch_name]
-    return not run_command(command,1)
-
-
-def create_pull_request(main_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_PR_BODY):
-    if not pr_title:
-        pr_title = get_current_branch().replace("_"," ")
-    if not pr_body:
-        pr_body = DEFAULT_PR_BODY
-    else:
-        pr_body = pr_body + "\n" + DEFAULT_PR_BODY
-    command = ["hub", "pull-request", "-b", main_branch, "-m", pr_title + "\n" + pr_body]
     return run_command(command, 1)
 
 
 def get_current_branch():
-    branches = subprocess.check_output(["git", "branch"])
-    try:
-        for b in branches.split("\n"):
-            if b[0] == "*":
-                current_branch = b.split(" ")[1]
-                break
-        return current_branch
-    except:
-        return "master"
+    popen = subprocess.Popen("git status | head -n 1 | cut -f 3 -d ' '", stdin=subprocess.PIPE, shell=True,
+                             stdout=subprocess.PIPE)
+    return str(popen.communicate()[0]).strip("\n")
 
 
 def get_submodule_name():
@@ -134,7 +105,7 @@ def cd(path):
     run_command(command)
 
 
-def add_changes(file_paths, is_add_all):
+def add_changes(is_add_all, file_paths):
     if is_add_all:
         error = add_all()
     elif file_paths:
@@ -142,21 +113,127 @@ def add_changes(file_paths, is_add_all):
 
     if error:
         print("No files to be added!")
+        return 1
+    else:
         return 0
+
+
+def delete_branch(branch_name):
+    command = ["git", "branch", "-D", branch_name]
+    res = run_command(command, 1)
+    return res
+
+
+def create_branch(branch_name):
+    command = ["git", "checkout", "-q", "-b", branch_name]
+    res = run_command(command, 0)
+    if res == 128:
+        print branch_name + " branch already exists"
+        answer = raw_input("would you like me to delete it (y/n)?")
+        if str.lower(answer) == 'y':
+            delete_branch(branch_name)
+            return create_branch(branch_name)
+        else:
+            return 1
+    else:
+        return res
+
+
+def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
+    if not commit_message:
+        commit_message = DEFAULT_COMMIT_MESSAGE
+    command = ["git", "commit", "-m", commit_message]
+    res = run_command(command)
+    return res
+
+
+def push(branch_name):
+    command = ["git", "push", "--set-upstream", "origin", branch_name]
+    res = run_command(command)
+    return res
+
+
+def create_pull_request(from_branch, to_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_PR_BODY):
+    if not pr_title:
+        pr_title = get_current_branch().replace("_", " ")
+    if not pr_body:
+        pr_body = DEFAULT_PR_BODY
+    else:
+        pr_body = pr_body + "\n" + DEFAULT_PR_BODY
+
+    command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
+    pr_url = run_command(command, 1)
+
+    if pr_url and str(pr_url)[:4] == "http":
+        print(pr_url)
+        launch_browser(pr_url)
+        return 0
+    elif pr_url:
+        print("\n" + str(pr_url) + "\n")
+        return 1
     else:
         return 1
 
 
+def process_from_child(origin, new, is_add_all, file_paths, commit_message, pr_title, pr_body):
+    if create_branch(new):
+        return "Failed to create the new branch"
+
+    if add_changes(is_add_all, file_paths):
+        return "Failed to add files"
+
+    if commit(commit_message):
+        return "Failed to commit changes"
+
+    if push(new):
+        return "Failed to push the commit to origin"
+
+    if create_pull_request(new, origin, pr_title, pr_body):
+        return "Failed to create pull-request from " + new + " to " + origin
+
+
+def process_to_parent(origin, parent, is_add_all, file_paths, commit_message, pr_title, pr_body):
+    if add_changes(is_add_all, file_paths):
+        return "Failed to add files"
+
+    if commit(commit_message):
+        return "Failed to commit changes"
+
+    if push(origin):
+        return "Failed to push the commit to origin"
+
+    if create_pull_request(origin, parent, pr_title, pr_body):
+        return "Failed to create pull-request from " + origin + " to " + parent
+
+
+def process_from_child_to_parent(branch_child, branch_parent, is_add_all, file_paths, commit_message, pr_title,
+                                 pr_body):
+    if create_branch(branch_child):
+        return "Failed to create the new branch"
+
+    if add_changes(is_add_all, file_paths):
+        return "Failed to add files"
+
+    if commit(commit_message):
+        return "Failed to commit changes"
+
+    if push(branch_child):
+        return "Failed to push the commit to origin"
+
+    if create_pull_request(branch_child, branch_parent, pr_title, pr_body):
+        return "Failed to create pull-request from " + branch_child + " to " + branch_parent
+
+
 def main():
-    child_branch_name = ""
+    branch_child = ""
     pr_title = ""
     pr_body = ""
     file_paths = []
     # get main branch name
-    parent_branch = ""
+    branch_parent = ""
     commit_message = ""
     submodule = 0
-    current_branch = get_current_branch()
+    branch_origin = get_current_branch()
     is_add_all = False
     if "--version" in sys.argv:
         print "1.0.1"
@@ -171,7 +248,7 @@ def main():
         verbose_is_on = 1
 
     if "-b" in sys.argv:
-        child_branch_name = sys.argv[sys.argv.index("-b") + 1]
+        branch_child = sys.argv[sys.argv.index("-b") + 1]
 
     if "-pb" in sys.argv:
         pr_body = sys.argv[sys.argv.index("-pb") + 1]
@@ -185,7 +262,7 @@ def main():
         is_add_all = True
 
     if "-upto" in sys.argv:
-        parent_branch = sys.argv[sys.argv.index("-upto") + 1]
+        branch_parent = sys.argv[sys.argv.index("-upto") + 1]
 
     if "-sub" in sys.argv:
         submodule = 1
@@ -193,33 +270,23 @@ def main():
     if "-m" in sys.argv:
         commit_message = str(sys.argv[sys.argv.index("-m") + 1])
 
-    if submodule:
-        cd(get_submodule_name())
-    # find changes and commit them
+    # if submodule:
+    #     cd(get_submodule_name())
 
-    if child_branch_name:
-        create_branch(child_branch_name)
-        target_branch_name = current_branch
-    elif parent_branch:
-        target_branch_name = parent_branch
-    else:
+    if not branch_child and not branch_parent:
         print USEAGE
         return
 
-    # add and commit changes
-    add_changes(file_paths, is_add_all)
-    commit(commit_message)
-
-    # push the branch
-    push(current_branch)
-    pr_url = create_pull_request(target_branch_name, pr_title, pr_body)
-    if pr_url[:4] == "http":
-        print(pr_url)
-        launch_browser(pr_url)
+    if branch_child and not branch_parent:
+        print process_from_child(branch_origin, branch_child, is_add_all, file_paths, commit_message, pr_title, pr_body)
+    elif branch_parent and not branch_child:
+        print process_to_parent(branch_origin, branch_parent, is_add_all, file_paths, commit_message, pr_title, pr_body)
+    elif branch_child and branch_parent:
+        print process_from_child_to_parent(branch_child, branch_parent, is_add_all, file_paths, commit_message,
+                                           pr_title,
+                                           pr_body)
     else:
-        print("\n"+pr_url+"\n")
-
-    checkout(current_branch)
+        return
 
 
 if __name__ == "__main__":
