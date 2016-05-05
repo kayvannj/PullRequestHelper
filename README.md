@@ -5,11 +5,13 @@ Assume you are on master branch and you make some changes but you want your chan
 With ```prh``` you can create a new branch, add the changed files, commit them, push the branch to origin, and create a pull-request from the new branch to your main branch with just one command:<br>
 ```prh -b my_new_branch```<br>
 
-You can use prh in two main ways:<br>
-1) when you are in a parent branch and want to make a PR that contains your changes to the branch you are at<br>
+You can use prh in three main ways:<br>
+1) create a pr from a new branch to current branch<br>
     ```prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]```<br>
-2) when you are in a child branch and want to just make a PR to a specific parent branch<br>
+2) create a pr from current branch to a different branch<br>
     ```prh -upto <parent_branch_name>```<br>
+3) create a pr from a new branch to a different branch<br>
+    ```prh -b <child_branch_name> -upto <parent_branch_name>```<br>
 <br>
 
 <br>

@@ -6,11 +6,14 @@ import sys
 # user is on version branch
 # running prh -b "branch" -a <file 1> <file 2> <file 3> ...
 USEAGE = """
-    You can use prh in two main ways:
-    1) when you are in a parent branch and want to make a PR that contains your changes to the branch you are at
-    prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]
-    2) when you are in a child branch and want to just make a PR to a specific parent branch
-    prh -upto <parent_branch_name>
+    You can use prh in three main ways:<br>
+    1) create a pr from a new branch to current branch
+        prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]
+    2) create a pr from current branch to a different branch
+        prh -upto <parent_branch_name>
+    3) create a pr from a new branch to a different branch
+        prh -b <child_branch_name> -upto <parent_branch_name>
+
 
     if -a  is not used, prh will add all the changed files using 'git add -A'
 
@@ -20,6 +23,7 @@ USEAGE = """
     -pb to append a message to the PullRequest body
     -d  run in debug mode which means not executing commands and just printing them
     -v  run in verbose mode
+    -s  stay on current branch
     -h  show help
     --version print the version of the app
 """
@@ -29,6 +33,7 @@ DEFAULT_PR_TITLE = "PRH"
 DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
 debug_is_on = 0
 verbose_is_on = 0
+stay_is_on = 0
 
 
 def run_command(command, output=0):
@@ -169,7 +174,6 @@ def create_pull_request(from_branch, to_branch, pr_title=DEFAULT_PR_TITLE, pr_bo
         launch_browser(pr_url)
         return 0
     elif pr_url:
-        print("\n" + str(pr_url) + "\n")
         return 1
     else:
         return 1
@@ -191,6 +195,9 @@ def process_from_child(origin, new, is_add_all, file_paths, commit_message, pr_t
     if create_pull_request(new, origin, pr_title, pr_body):
         return "Failed to create pull-request from " + new + " to " + origin
 
+    if stay_is_on:
+        checkout(origin)
+
 
 def process_to_parent(origin, parent, is_add_all, file_paths, commit_message, pr_title, pr_body):
     if add_changes(is_add_all, file_paths):
@@ -206,7 +213,8 @@ def process_to_parent(origin, parent, is_add_all, file_paths, commit_message, pr
         return "Failed to create pull-request from " + origin + " to " + parent
 
 
-def process_from_child_to_parent(branch_child, branch_parent, is_add_all, file_paths, commit_message, pr_title,
+def process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_add_all, file_paths, commit_message,
+                                 pr_title,
                                  pr_body):
     if create_branch(branch_child):
         return "Failed to create the new branch"
@@ -222,6 +230,9 @@ def process_from_child_to_parent(branch_child, branch_parent, is_add_all, file_p
 
     if create_pull_request(branch_child, branch_parent, pr_title, pr_body):
         return "Failed to create pull-request from " + branch_child + " to " + branch_parent
+
+    if stay_is_on:
+        checkout(branch_origin)
 
 
 def main():
@@ -246,6 +257,10 @@ def main():
     if "-v" in sys.argv:
         global verbose_is_on
         verbose_is_on = 1
+
+    if "-s" in sys.argv:
+        global stay_is_on
+        stay_is_on = 1
 
     if "-b" in sys.argv:
         branch_child = sys.argv[sys.argv.index("-b") + 1]
@@ -282,7 +297,8 @@ def main():
     elif branch_parent and not branch_child:
         print process_to_parent(branch_origin, branch_parent, is_add_all, file_paths, commit_message, pr_title, pr_body)
     elif branch_child and branch_parent:
-        print process_from_child_to_parent(branch_child, branch_parent, is_add_all, file_paths, commit_message,
+        print process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_add_all, file_paths,
+                                           commit_message,
                                            pr_title,
                                            pr_body)
     else:
