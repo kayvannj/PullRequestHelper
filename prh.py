@@ -174,7 +174,6 @@ def create_pull_request(from_branch, to_branch, pr_title=DEFAULT_PR_TITLE, pr_bo
         launch_browser(pr_url)
         return 0
     elif pr_url:
-        print("\n" + str(pr_url) + "\n")
         return 1
     else:
         return 1
