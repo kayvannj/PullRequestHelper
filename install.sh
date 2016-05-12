@@ -1,5 +1,6 @@
 #!/bin/sh
 cp prh.py /usr/local/bin/prh
+cp prh_config.py /usr/local/bin/prh_config.py
 chmod +x /usr/local/bin/prh
 username=$1
 token=$2

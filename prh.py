@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import subprocess
 import sys
+import prh_config
 
 APP_VERSION = "1.0.2"
 
@@ -27,10 +28,8 @@ USEAGE = """
     -h  show help
     --version print the version of the app
 """
-DEFAULT_COMMIT_MESSAGE = "Commit"
-DEFAULT_BRANCH_NAME = "prh_branch"
-DEFAULT_PR_TITLE = "PRH"
-DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
+DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
+DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
 debug_is_on = 0
 verbose_is_on = 0
 stay_is_on = 0
@@ -114,7 +113,7 @@ def cd(path):
 def add_changes(is_add_all, file_paths):
     error = 0
     if is_add_all:
-        print(run_command(["git", "add", "-A", "-n"], 1))
+        print("\n"+run_command(["git", "add", "-A", "-n"], 1))
         answer = raw_input(">>> Would you like to apply above changes (y/n)? ")
         if str.lower(answer) == 'y':
             error = add_all()
@@ -173,7 +172,7 @@ def push(branch_name):
     return res
 
 
-def create_pull_request(from_branch, to_branch, pr_title=DEFAULT_PR_TITLE, pr_body=DEFAULT_PR_BODY):
+def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BODY):
     if not pr_title:
         pr_title = get_current_branch().replace("_", " ")
     if not pr_body:
