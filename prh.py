@@ -1,10 +1,9 @@
 #!/usr/bin/python
 import subprocess
 import sys
-# import subprocess.CalledProcessError
 
-# user is on version branch
-# running prh -b "branch" -a <file 1> <file 2> <file 3> ...
+APP_VERSION = "1.0.2"
+
 USEAGE = """
     You can use prh in three main ways:<br>
     1) create a pr from a new branch to current branch
@@ -18,6 +17,7 @@ USEAGE = """
     if -a  is not used, prh will add all the changed files using 'git add -A'
 
     -a  to add only specified file into the PR
+        or if no file mentioned will not add any file and just create a pr for existing commits
     -m  to add a comment message
     -pt to customize the PullRequest Title
     -pb to append a message to the PullRequest body
@@ -34,6 +34,7 @@ DEFAULT_PR_BODY = "@doximitystevenlee CR please\n"
 debug_is_on = 0
 verbose_is_on = 0
 stay_is_on = 0
+is_just_pr = 0
 
 
 def run_command(command, output=0):
@@ -111,10 +112,23 @@ def cd(path):
 
 
 def add_changes(is_add_all, file_paths):
+    error = 0
     if is_add_all:
-        error = add_all()
+        print(run_command(["git", "add", "-A", "-n"], 1))
+        answer = raw_input(">>> Would you like to apply above changes (y/n)? ")
+        if str.lower(answer) == 'y':
+            error = add_all()
+        else:
+            return 1
+
     elif file_paths:
         error = add_files(file_paths)
+    else:
+        answer = raw_input(">>> No file has been added, would you like to continue creating PR (y/n)? ")
+        if str.lower(answer) == 'y':
+            global is_just_pr
+            is_just_pr = 1
+            return 0
 
     if error:
         print("No files to be added!")
@@ -133,8 +147,7 @@ def create_branch(branch_name):
     command = ["git", "checkout", "-q", "-b", branch_name]
     res = run_command(command, 0)
     if res == 128:
-        print branch_name + " branch already exists"
-        answer = raw_input("would you like me to delete it (y/n)?")
+        answer = raw_input(">>> Branch already exists, would you like me to delete it (y/n)? ")
         if str.lower(answer) == 'y':
             delete_branch(branch_name)
             return create_branch(branch_name)
@@ -145,6 +158,8 @@ def create_branch(branch_name):
 
 
 def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
+    if is_just_pr:
+        return 0
     if not commit_message:
         commit_message = DEFAULT_COMMIT_MESSAGE
     command = ["git", "commit", "-m", commit_message]
@@ -247,7 +262,7 @@ def main():
     branch_origin = get_current_branch()
     is_add_all = False
     if "--version" in sys.argv:
-        print "1.0.1"
+        print APP_VERSION
         return
 
     if "-debug" in sys.argv or "-d" in sys.argv:
