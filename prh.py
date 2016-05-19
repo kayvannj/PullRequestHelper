@@ -44,7 +44,6 @@ is_just_pr = 0
 is_in_submodule = 0
 
 
-
 def run_command(command, output=0):
     """
     run the given command
@@ -205,7 +204,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BOD
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
 
     if pivotal_tracker_story_url:
-        pr_body += "\n Story: "+pivotal_tracker_story_url
+        pr_body += "\n Story: " + pivotal_tracker_story_url
 
     command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
     pr_url = run_command(command, 1)
@@ -215,7 +214,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BOD
         launch_browser(pr_url)
 
         if pivotal_tracker_story_id:
-            if pivotal_tracker.finish_and_post_message(pivotal_tracker_story_id, "PR: "+pr_url):
+            if pivotal_tracker.finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
                 print "error with pivotal"
 
         return 0
@@ -338,10 +337,13 @@ def main():
         re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
 
         if re_search:
+            full_url = re_search.group(0)
+            story_id = re_search.group(1)
             global pivotal_tracker_story_id
-            pivotal_tracker_story_id = re_search.group(1)
+            pivotal_tracker_story_id = story_id
             global pivotal_tracker_story_url
-            pivotal_tracker_story_url = re_search.group(0)
+            pivotal_tracker_story_url = full_url
+            commit_message = commit_message.replace(full_url, "")
 
     if "-l" in sys.argv:
         global local_only_is_on
