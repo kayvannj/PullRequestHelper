@@ -1,7 +1,10 @@
 #!/usr/bin/python
+import re
 import subprocess
 import sys
 import prh_config
+import os
+import pivotal_tracker
 
 APP_VERSION = "1.0.2"
 
@@ -30,10 +33,16 @@ USEAGE = """
 """
 DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
+PIVOTAL_TRACKER_PROJECT_ID = prh_config.PIVOTAL_TRACKER_PROJECT_ID
+pivotal_tracker_story_id = ""
+pivotal_tracker_story_url = ""
 debug_is_on = 0
 verbose_is_on = 0
+local_only_is_on = 0
 stay_is_on = 0
 is_just_pr = 0
+is_in_submodule = 0
+
 
 
 def run_command(command, output=0):
@@ -113,7 +122,7 @@ def cd(path):
 def add_changes(is_add_all, file_paths):
     error = 0
     if is_add_all:
-        print("\n"+run_command(["git", "add", "-A", "-n"], 1))
+        print("\n" + str(run_command(["git", "add", "-A", "-n"], 1)))
         answer = raw_input(">>> Would you like to apply above changes (y/n)? ")
         if str.lower(answer) == 'y':
             error = add_all()
@@ -167,12 +176,18 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
 
 
 def push(branch_name):
+    if local_only_is_on:
+        return 0
+
     command = ["git", "push", "--set-upstream", "origin", branch_name]
     res = run_command(command)
     return res
 
 
 def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BODY):
+    if local_only_is_on:
+        return 0
+
     if not pr_title:
         pr_title = get_current_branch().replace("_", " ")
     if not pr_body:
@@ -180,12 +195,20 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BOD
     else:
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
 
+    if pivotal_tracker_story_url:
+        pr_body += "\n Story: "+pivotal_tracker_story_url
+
     command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
     pr_url = run_command(command, 1)
 
     if pr_url and str(pr_url)[:4] == "http":
         print(pr_url)
         launch_browser(pr_url)
+
+        if pivotal_tracker_story_id:
+            if pivotal_tracker.finish_and_post_message(pivotal_tracker_story_id, "PR: "+pr_url):
+                print "error with pivotal"
+
         return 0
     elif pr_url:
         return 1
@@ -286,7 +309,12 @@ def main():
         pr_title = sys.argv[sys.argv.index("-pt") + 1]
 
     if "-a" in sys.argv:
-        file_paths = sys.argv[sys.argv.index("-a") + 1:]
+        key_index = sys.argv.index("-a")
+        for p in sys.argv[key_index + 1:]:
+            if os.path.exists(p):
+                file_paths.append(p)
+            else:
+                break
     else:
         is_add_all = True
 
@@ -298,9 +326,22 @@ def main():
 
     if "-m" in sys.argv:
         commit_message = str(sys.argv[sys.argv.index("-m") + 1])
+        re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
 
-    # if submodule:
-    #     cd(get_submodule_name())
+        if re_search:
+            global pivotal_tracker_story_id
+            pivotal_tracker_story_id = re_search.group(1)
+            global pivotal_tracker_story_url
+            pivotal_tracker_story_url = re_search.group(0)
+
+    if "-l" in sys.argv:
+        global local_only_is_on
+        local_only_is_on = 1
+
+    if submodule:
+        cd(get_submodule_name())
+        global is_in_submodule
+        is_in_submodule = 1
 
     if not branch_child and not branch_parent:
         print USEAGE
@@ -321,4 +362,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # print(get_status())
