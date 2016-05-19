@@ -10,6 +10,7 @@ please modify the prh_config.py and run the install again
 "
 fi
 cp prh_config.py /usr/local/bin/prh_config.py
+cp pivotal_tracker.py /usr/local/bin/pivotal_tracker.py
 chmod +x /usr/local/bin/prh
 username=$1
 token=$2
