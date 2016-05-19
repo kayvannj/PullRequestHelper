@@ -121,16 +121,25 @@ def cd(path):
 
 def add_changes(is_add_all, file_paths):
     error = 0
-    if is_add_all:
-        print("\n" + str(run_command(["git", "add", "-A", "-n"], 1)))
-        answer = raw_input(">>> Would you like to apply above changes (y/n)? ")
-        if str.lower(answer) == 'y':
-            error = add_all()
-        else:
-            return 1
 
-    elif file_paths:
+    if file_paths:
         error = add_files(file_paths)
+
+    elif is_add_all:
+        list_of_changes = str(run_command(["git", "add", "-A", "-n"], 1)).strip()
+        if not list_of_changes:
+            answer = raw_input(">>> No file has been added, would you like to continue creating PR (y/n)? ")
+            if str.lower(answer) == 'y':
+                global is_just_pr
+                is_just_pr = 1
+                return 0
+        else:
+            print("\n" + list_of_changes)
+            answer = raw_input(">>> Would you like to apply above changes (y/n)? ")
+            if str.lower(answer) == 'y':
+                error = add_all()
+            else:
+                return 1
     else:
         answer = raw_input(">>> No file has been added, would you like to continue creating PR (y/n)? ")
         if str.lower(answer) == 'y':
