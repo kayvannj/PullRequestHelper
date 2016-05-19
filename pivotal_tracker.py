@@ -1,14 +1,11 @@
 import json
 import prh_config
-__author__ = 'kayvan'
-
 import requests
 
+__author__ = 'kayvan'
+
+
 API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
-# PROJECT_ID = 61085 #mobile
-# story_id = 115053971
-PROJECT_ID = 1473026
-STORY_ID = 107210010
 
 base_endpoint = "https://www.pivotaltracker.com/services/v5"
 
@@ -59,7 +56,4 @@ def finish_and_post_message(story_id, message):
 
 
 if __name__ == '__main__':
-    try:
-        print mark_story_finished(PROJECT_ID, STORY_ID)
-    except requests.exceptions.ConnectionError:
-        print("Error connecting to Pivotal Tracker api")
+    pass
