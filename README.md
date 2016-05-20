@@ -37,10 +37,10 @@ sudo ./install.sh <github-username> <github-token>
 you are good to go :)
 
 ## Config
-`DEFAULT_COMMIT_MESSAGE` A default message for commits if `-m` is not used
-`DEFAULT_PULL_REQUEST_BODY` A default message for Pull-Request body (like a template), the content of `-pb` will be appended to this
-`PIVOTAL_TRACKER_API_TOKEN` An API token for Pivotal tracker that can be found in your Pivotal Tracker Profile section
-`PIVOTAL_TRACKER_PROJECT_ID` The project id for your pivotal tracker
+`DEFAULT_COMMIT_MESSAGE` A default message for commits if `-m` is not used<br>
+`DEFAULT_PULL_REQUEST_BODY` A default message for Pull-Request body (like a template), the content of `-pb` will be appended to this<br>
+`PIVOTAL_TRACKER_API_TOKEN` An API token for Pivotal tracker that can be found in your Pivotal Tracker Profile section<br>
+`PIVOTAL_TRACKER_PROJECT_ID` The project id for your pivotal tracker<br>
 
 ## Options
 if `-a`  is not used, prh will add all the changed files using `git add -A`<br>
