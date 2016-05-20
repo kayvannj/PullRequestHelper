@@ -13,7 +13,10 @@ You can use prh in three main ways:<br>
 3) create a pr from a new branch to a different branch<br>
     ```prh -b <child_branch_name> -upto <parent_branch_name>```<br>
 <br>
-
+If you are using Pivotal Tracker, you can configure the prh_config.py file with 
+your project id and api token and then all you need to do is to post a link to 
+your story in the ```-m``` option along side of your commit message and prh will mark the 
+story finished and link PR to the story.  
 <br>
 ## Dependency
 python 2.7 https://www.python.org/download/releases/2.7/<br>
@@ -32,6 +35,12 @@ chmod +x install.sh
 sudo ./install.sh <github-username> <github-token>
 ```
 you are good to go :)
+
+## Config
+`DEFAULT_COMMIT_MESSAGE` A default message for commits if `-m` is not used
+`DEFAULT_PULL_REQUEST_BODY` A default message for Pull-Request body (like a template), the content of `-pb` will be appended to this
+`PIVOTAL_TRACKER_API_TOKEN` An API token for Pivotal tracker that can be found in your Pivotal Tracker Profile section
+`PIVOTAL_TRACKER_PROJECT_ID` The project id for your pivotal tracker
 
 ## Options
 if `-a`  is not used, prh will add all the changed files using `git add -A`<br>
