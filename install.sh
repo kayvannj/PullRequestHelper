@@ -6,16 +6,16 @@ DEFAULT_PULL_REQUEST_BODY = \"\" # optional
 PIVOTAL_TRACKER_API_TOKEN = \"\" # optional
 PIVOTAL_TRACKER_PROJECT_ID = \"\" # optional" > prh_config.py
 echo "
-please modify the prh_config.py and run the install again
+>>> please modify the prh_config.py and run the install again <<<
 "
-fi
-cp prh_config.py /usr/local/bin/prh_config.py
-cp pivotal_tracker.py /usr/local/bin/pivotal_tracker.py
-chmod +x /usr/local/bin/prh
-username=$1
-token=$2
-if [[ ! -z $1 ]]; then
-  echo "github.com:
+else
+  cp prh_config.py /usr/local/bin/prh_config.py
+  cp pivotal_tracker.py /usr/local/bin/pivotal_tracker.py
+  chmod +x /usr/local/bin/prh
+  username=$1
+  token=$2
+  if [[ ! -z $1 ]]; then
+    echo "github.com:
   - user: $username
     oauth_token: $token
     protocol: https" > ~/.config/hub
@@ -31,4 +31,6 @@ to create the file with correct credentials
 
 prh install was succesful
 "
+  fi
 fi
+
