@@ -6,7 +6,7 @@ import prh_config
 import os
 import pivotal_tracker
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 USEAGE = """
     You can use prh in three main ways:<br>
@@ -33,7 +33,6 @@ USEAGE = """
 """
 DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
-PIVOTAL_TRACKER_PROJECT_ID = prh_config.PIVOTAL_TRACKER_PROJECT_ID
 pivotal_tracker_story_id = ""
 pivotal_tracker_story_url = ""
 debug_is_on = 0
