@@ -4,7 +4,6 @@ import requests
 
 __author__ = 'kayvan'
 
-
 API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
 
 base_endpoint = "https://www.pivotaltracker.com/services/v5"
@@ -45,12 +44,19 @@ def post_comment(project_id, story_id, text):
     return resp.json()
 
 
+def get_project_id(story_id):
+    api = "{}/stories/{}".format(base_endpoint, story_id)
+    resp = get(api)
+    return resp.json()["project_id"]
+
+
 def finish_and_post_message(story_id, message):
+    project_id = get_project_id(story_id)
     if not API_TOKEN:
         return 1
-    if not mark_story_finished(prh_config.PIVOTAL_TRACKER_PROJECT_ID, story_id):
+    if not mark_story_finished(project_id, story_id):
         return 1
-    if not post_comment(prh_config.PIVOTAL_TRACKER_PROJECT_ID, story_id, message):
+    if not post_comment(project_id, story_id, message):
         return 1
     return 0
 
