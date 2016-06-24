@@ -180,7 +180,6 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
     if not commit_message:
         story_json = pivotal_tracker.get_story(pivotal_tracker_story_id)
         commit_message = story_json["name"]
-        # commit_message = DEFAULT_COMMIT_MESSAGE
     command = ["git", "commit", "-m", commit_message]
     res = run_command(command)
     return res
@@ -195,7 +194,7 @@ def push(branch_name):
     return res
 
 
-def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BODY):
+def create_pull_request(from_branch, to_branch, pr_title, pr_body):
     if local_only_is_on:
         return 0
 
@@ -205,6 +204,8 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body=DEFAULT_PR_BOD
         pr_body = DEFAULT_PR_BODY
     else:
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
+
+    pr_body = pr_body + "\n\nStory Description:\n" + pivotal_tracker.get_story(pivotal_tracker_story_id)["description"]
 
     if pivotal_tracker_story_url:
         pr_body += "\n Story: " + pivotal_tracker_story_url
