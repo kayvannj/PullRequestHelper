@@ -178,8 +178,12 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
     if is_just_pr:
         return 0
     if not commit_message:
-        story_json = pivotal_tracker.get_story(pivotal_tracker_story_id)
-        commit_message = story_json["name"]
+        if pivotal_tracker_story_id:
+            story_json = pivotal_tracker.get_story(pivotal_tracker_story_id)
+            commit_message = story_json["name"]
+        else:
+            commit_message = prh_config.DEFAULT_COMMIT_MESSAGE
+            
     command = ["git", "commit", "-m", commit_message]
     res = run_command(command)
     return res
@@ -208,15 +212,13 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
     if pivotal_tracker_story_url:
         description = pivotal_tracker.get_story(pivotal_tracker_story_id)["description"]
         name = pivotal_tracker.get_story(pivotal_tracker_story_id)["name"]
-        pr_body = pr_body + "\n\n**Story:** [" + name + "]("+pivotal_tracker_story_url+")\n" + description
+        pr_body = pr_body + "\n\n**Story:** [" + name + "](" + pivotal_tracker_story_url + ")\n" + description
 
     command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
     pr_url = run_command(command, 1)
 
     if pr_url and str(pr_url)[:4] == "http":
-        print(pr_url)
         launch_browser(pr_url)
-
         if pivotal_tracker_story_id:
             if pivotal_tracker.finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
                 print "error with pivotal"
@@ -247,6 +249,8 @@ def process_from_child(origin, new, is_add_all, file_paths, commit_message, pr_t
     if stay_is_on:
         checkout(origin)
 
+    return "Done"
+
 
 def process_to_parent(origin, parent, is_add_all, file_paths, commit_message, pr_title, pr_body):
     if add_changes(is_add_all, file_paths):
@@ -260,6 +264,8 @@ def process_to_parent(origin, parent, is_add_all, file_paths, commit_message, pr
 
     if create_pull_request(origin, parent, pr_title, pr_body):
         return "Failed to create pull-request from " + origin + " to " + parent
+
+    return "Done"
 
 
 def process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_add_all, file_paths, commit_message,
@@ -282,6 +288,8 @@ def process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_
 
     if stay_is_on:
         checkout(branch_origin)
+
+    return "Done"
 
 
 def revert_all(branch_origin, branch_child, branch_parent, is_add_all, file_paths):

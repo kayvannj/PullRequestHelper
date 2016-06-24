@@ -12,29 +12,29 @@ story = ""
 
 def get(api):
     response = requests.get(api, headers={"X-TrackerToken": API_TOKEN})
-    print(api, response.status_code)
+    # print(api, response.status_code)
     return response
 
 
 def post(api, data):
     response = requests.post(api, data=data, headers={"X-TrackerToken": API_TOKEN})
-    print(api, response.status_code)
+    # print(api, response.status_code)
     return response
 
 
 def put(api, data):
     response = requests.put(api, data=data, headers={"X-TrackerToken": API_TOKEN})
-    print(api, response.status_code)
+    # print(api, response.status_code)
     return response
 
 
 def get_story(story_id):
+    global story
     if story:
         return story
 
     api = "{}/stories/{}".format(base_endpoint, story_id)
     resp = get(api)
-    global story
     story = resp.json()
     return story
 
@@ -52,12 +52,12 @@ def post_comment(project_id, story_id, text):
 
 
 def get_project_id(story_id):
+    global story
     if story:
-        return story
+        return story["project_id"]
 
     api = "{}/stories/{}".format(base_endpoint, story_id)
     resp = get(api)
-    global story
     story = resp.json()
     return story["project_id"]
 
