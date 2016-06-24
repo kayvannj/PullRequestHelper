@@ -27,8 +27,9 @@ def put(api, data):
     return response
 
 
-def get_story(project_id, story_id):
-    resp = get("{}/projects/{}/stories/{}".format(base_endpoint, project_id, story_id))
+def get_story(story_id):
+    api = "{}/stories/{}".format(base_endpoint, story_id)
+    resp = get(api)
     return resp.json()
 
 

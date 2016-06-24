@@ -178,7 +178,9 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
     if is_just_pr:
         return 0
     if not commit_message:
-        commit_message = DEFAULT_COMMIT_MESSAGE
+        story_json = pivotal_tracker.get_story(pivotal_tracker_story_id)
+        commit_message = story_json["name"]
+        # commit_message = DEFAULT_COMMIT_MESSAGE
     command = ["git", "commit", "-m", commit_message]
     res = run_command(command)
     return res
@@ -279,6 +281,11 @@ def process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_
 
     if stay_is_on:
         checkout(branch_origin)
+
+
+def revert_all(branch_origin, branch_child, branch_parent, is_add_all, file_paths):
+    if checkout(branch_origin):
+        return "Failed to check out original branch"
 
 
 def main():
