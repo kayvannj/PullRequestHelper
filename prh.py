@@ -205,10 +205,10 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
     else:
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
 
-    pr_body = pr_body + "\n\nStory Description:\n" + pivotal_tracker.get_story(pivotal_tracker_story_id)["description"]
-
     if pivotal_tracker_story_url:
-        pr_body += "\n Story: " + pivotal_tracker_story_url
+        description = pivotal_tracker.get_story(pivotal_tracker_story_id)["description"]
+        name = pivotal_tracker.get_story(pivotal_tracker_story_id)["name"]
+        pr_body = pr_body + "\n\n**Story:** [" + name + "]("+pivotal_tracker_story_url+")\n" + description
 
     command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
     pr_url = run_command(command, 1)
