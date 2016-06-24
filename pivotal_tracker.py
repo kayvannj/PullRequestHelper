@@ -1,12 +1,13 @@
-import json
-import prh_config
 import requests
+
+import prh_config
 
 __author__ = 'kayvan'
 
 API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
 
 base_endpoint = "https://www.pivotaltracker.com/services/v5"
+story = ""
 
 
 def get(api):
@@ -28,9 +29,14 @@ def put(api, data):
 
 
 def get_story(story_id):
+    if story:
+        return story
+
     api = "{}/stories/{}".format(base_endpoint, story_id)
     resp = get(api)
-    return resp.json()
+    global story
+    story = resp.json()
+    return story
 
 
 def mark_story_finished(project_id, story_id):
@@ -46,9 +52,14 @@ def post_comment(project_id, story_id, text):
 
 
 def get_project_id(story_id):
+    if story:
+        return story
+
     api = "{}/stories/{}".format(base_endpoint, story_id)
     resp = get(api)
-    return resp.json()["project_id"]
+    global story
+    story = resp.json()
+    return story["project_id"]
 
 
 def finish_and_post_message(story_id, message):
