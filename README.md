@@ -20,6 +20,7 @@ story finished and link PR to the story.
 <br>
 ## Dependency
 python 2.7 https://www.python.org/download/releases/2.7/<br>
+requests (python lib) http://docs.python-requests.org/en/master/user/install/#install<br>
 hub https://github.com/github/hub<br>
 
 ## Install
