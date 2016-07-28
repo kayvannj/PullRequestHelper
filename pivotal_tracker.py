@@ -1,5 +1,5 @@
+#!/usr/local/bin/python
 import requests
-
 import prh_config
 
 __author__ = 'kayvan'
