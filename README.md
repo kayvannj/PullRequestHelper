@@ -46,7 +46,8 @@ you are good to go :)
 ## Options
 if `-a`  is not used, prh will add all the changed files using `git add -A`<br>
 
-`-b` the new branch name for this PR<br>
+`-b` branch: the new branch name for this PR<br>
+`-sb` sub-branch: this option will append your given subbranch name to the name of current branch and use that as the new branch name, ex: when `current branch = v1`, using `-sb testing` will create new branch with name `v1_testing`
 `-upto` the parent branch to make a PR into
 `-a`  to add only specified file into the PR<br>
 `-m`  to add a comment message<br>
