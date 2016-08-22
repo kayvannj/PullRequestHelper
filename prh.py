@@ -327,6 +327,9 @@ def main():
     if "-b" in sys.argv:
         branch_child = sys.argv[sys.argv.index("-b") + 1]
 
+    if "-sb" in sys.argv:
+        branch_child = branch_origin+"_"+sys.argv[sys.argv.index("-sb") + 1]
+
     if "-pb" in sys.argv:
         pr_body = sys.argv[sys.argv.index("-pb") + 1]
 
