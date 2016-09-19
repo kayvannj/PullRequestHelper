@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
 import re
 import subprocess
 import sys
@@ -29,6 +29,7 @@ USEAGE = """
     -v  run in verbose mode
     -s  stay on current branch
     -h  show help
+    -l  local only, do not push changes
     --version print the version of the app
 """
 DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
