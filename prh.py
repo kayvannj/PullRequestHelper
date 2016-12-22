@@ -203,7 +203,7 @@ def push(branch_name):
 
 
 def create_pull_request(from_branch, to_branch, pr_title, pr_body):
-    command = ["git", "remote", "show", "origin", "|", "grep", "\"Fetch URL\""]
+    command = ["git", "remote", "show", "origin", "|", "grep", "Fetch URL"]
     fetch_url = run_command(command, 1)
     # Fetch URL: git@github.com:doximity/Android.git
     owner = fetch_url.split(":")[-1].split("/")[0]
