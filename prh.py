@@ -232,7 +232,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         "base": to_branch
     }
     headers = {"Authorization": "token b6f6d9549b9241ba2d49dfc7f329c0af2cdf82ef"}
-    res = requests.post(api, data=data, headers=headers)
+    res = requests.post(api, data=data,  auth=('kayvannj', '82e6bd2ba4b2fb7655cd3e1d71762847d1086fbc'))
     pr_url = res.json()["url"]
 
     if pr_url and str(pr_url)[:4] == "http":
