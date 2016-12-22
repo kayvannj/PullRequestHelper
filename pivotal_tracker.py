@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import requests
+from pip._vendor import requests
 import prh_config
 
 __author__ = 'kayvan'

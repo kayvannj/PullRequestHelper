@@ -2,10 +2,12 @@
 import re
 import subprocess
 import sys
+
+from pip._vendor import requests
+
 import prh_config
 import os
 import pivotal_tracker
-import requests
 
 APP_VERSION = "1.0.4"
 
