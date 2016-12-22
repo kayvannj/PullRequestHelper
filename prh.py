@@ -2,14 +2,14 @@
 import re
 import subprocess
 import sys
-
+import json
 from pip._vendor import requests
 
 import prh_config
 import os
 import pivotal_tracker
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 USEAGE = """
     You can use prh in three main ways:<br>
@@ -236,7 +236,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         "base": to_branch
     }
     headers = {"Authorization": "token " + prh_config.GITHUB_API_TOKEN}
-    res = requests.post(api, data=data, headers=headers)
+    res = requests.post(api, data=json.dumps(data), headers=headers)
     pr_url = res.json()["url"]
 
     if pr_url and str(pr_url)[:4] == "http":
