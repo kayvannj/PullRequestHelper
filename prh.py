@@ -5,8 +5,9 @@ import sys
 import prh_config
 import os
 import pivotal_tracker
+import requests
 
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.1.0"
 
 USEAGE = """
     You can use prh in three main ways:<br>
@@ -184,7 +185,7 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
             commit_message = story_json["name"]
         else:
             commit_message = prh_config.DEFAULT_COMMIT_MESSAGE
-            
+
     command = ["git", "commit", "-m", commit_message]
     res = run_command(command)
     return res
@@ -200,6 +201,11 @@ def push(branch_name):
 
 
 def create_pull_request(from_branch, to_branch, pr_title, pr_body):
+    command = ["git", "remote", "show", "origin", "|", "grep", "\"Fetch URL\""]
+    fetch_url = run_command(command, 1)
+    # Fetch URL: git@github.com:doximity/Android.git
+    owner = fetch_url.split(":")[-1].split("/")[0]
+    repo = fetch_url.split(":")[-1].split("/")[1].split(".")[0]
     if local_only_is_on:
         return 0
 
@@ -215,8 +221,19 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         name = pivotal_tracker.get_story(pivotal_tracker_story_id)["name"]
         pr_body = pr_body + "\n\n**Story:** [" + name + "](" + pivotal_tracker_story_url + ")\n" + description
 
-    command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
-    pr_url = run_command(command, 1)
+    # command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
+    # pr_url = run_command(command, 1)
+    github = "https://api.github.com"
+    api = "{}/repos/{}/{}/pulls".format(github, owner, repo)
+    data = {
+        "title": pr_title,
+        "body": pr_body,
+        "head": from_branch,
+        "base": to_branch
+    }
+    headers = {"Authorization": "token b6f6d9549b9241ba2d49dfc7f329c0af2cdf82ef"}
+    res = requests.post(api, data=data, headers=headers)
+    pr_url = res.json()["url"]
 
     if pr_url and str(pr_url)[:4] == "http":
         launch_browser(pr_url)
@@ -329,7 +346,7 @@ def main():
         branch_child = sys.argv[sys.argv.index("-b") + 1]
 
     if "-sb" in sys.argv:
-        branch_child = branch_origin+"_"+sys.argv[sys.argv.index("-sb") + 1]
+        branch_child = branch_origin + "_" + sys.argv[sys.argv.index("-sb") + 1]
 
     if "-pb" in sys.argv:
         pr_body = sys.argv[sys.argv.index("-pb") + 1]
