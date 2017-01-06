@@ -4,7 +4,7 @@
 class Pullrequesthelper < Formula
   desc "A tool to help creating PullRequests on Github easier and automate some of the steps"
   homepage "https://github.com/kayvannj/PullRequestHelper"
-  url "https://github.com/kayvannj/PullRequestHelper/archive/1.0.3.tar.gz"
+  url "https://github.com/kayvannj/PullRequestHelper/archive/2.0.0.tar.gz"
   sha256 "e4b4020dec0c8a8ba2a6d4b38509a45df5416f1b1983ddd135d551cbada3be38"
 
   bottle do
