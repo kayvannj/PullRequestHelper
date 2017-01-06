@@ -10,7 +10,11 @@ import requests
 import argparse
 import importlib
 
-APP_VERSION = "1.0.5"
+PRH_CONFIG_FILE_NAME = "prh_config"
+
+GIT_CONFIG_PATH = ".git/config"
+
+APP_VERSION = "2.0.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -24,7 +28,7 @@ local_only_is_on = 0
 stay_is_on = 0
 is_just_pr = 0
 is_in_submodule = 0
-prh_config_file = "config_file_path"
+prh_config_file = "config_file_path/"
 
 base_endpoint = "https://www.pivotaltracker.com/services/v5"
 story = ""
@@ -455,14 +459,18 @@ def main(args):
 def setup():
     print "Running setup"
 
-    with open(".git/config") as git_config:
-        is_in_origin = False
-        for line in git_config.readlines():
-            if '[remote "origin"]' in line:
-                is_in_origin = True
-            if is_in_origin and 'url' in line:
-                fetch_url = line.split('=')[1].strip()
-                break
+    if os.path.exists(GIT_CONFIG_PATH):
+        with open(GIT_CONFIG_PATH) as git_config:
+            is_in_origin = False
+            for line in git_config.readlines():
+                if '[remote "origin"]' in line:
+                    is_in_origin = True
+                if is_in_origin and 'url' in line:
+                    fetch_url = line.split('=')[1].strip()
+                    break
+    else:
+        print "You should run prh from a git repository directory"
+        return
 
     if not fetch_url:
         print "Could not find origin url in the .git/config file"
@@ -472,8 +480,6 @@ def setup():
     owner = fetch_url.split(":")[-1].split("/")[0]
     repo = fetch_url.split(":")[-1].split("/")[1].split(".")[0]
     write_to_setup_file(owner, repo)
-    print "Finished. enjoy using PRH"
-
 
 def run_popen(command):
     popen = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, stdout=subprocess.PIPE)
@@ -492,9 +498,10 @@ def write_to_setup_file(owner, repo):
 def read_from_setup_file():
     command = ["git rev-parse --show-toplevel"]
     repo_root_path = run_popen(command)
-    with open(repo_root_path + '/.prh', 'r') as f:
-        line = f.readline()
-        return line.split("/")
+    if os.path.exists(repo_root_path+'/.prh'):
+        with open(repo_root_path + '/.prh', 'r') as f:
+            line = f.readline()
+            return line.split("/")
 
 
 def parse_arguments():
@@ -534,17 +541,28 @@ def parse_arguments():
     return args
 
 
+def write_to_config_file(dic):
+    with open(prh_config_file + PRH_CONFIG_FILE_NAME+".py", mode='w') as f:
+        for key in dic:
+            f.write(key + "=" + dic[key] + "\n")
+
+
 if __name__ == "__main__":
-    prh_config = importlib.import_module("prh_config", prh_config_file)
-    global DEFAULT_COMMIT_MESSAGE
+    prh_config = importlib.import_module(PRH_CONFIG_FILE_NAME, prh_config_file)
+
     DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
-    global DEFAULT_PR_BODY
     DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
-    global PIVOTAL_TRACKER_API_TOKEN
     PIVOTAL_TRACKER_API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
-    global GITHUB_API_TOKEN
     GITHUB_API_TOKEN = prh_config.GITHUB_API_TOKEN
 
+    setup_config = read_from_setup_file()
+    if not setup_config:
+        setup()
     if not GITHUB_API_TOKEN:
-        GITHUB_API_TOKEN = input("Please enter your Github API token:")
+        GITHUB_API_TOKEN = raw_input("Please enter your Github API token: ")
+    if not PIVOTAL_TRACKER_API_TOKEN:
+        PIVOTAL_TRACKER_API_TOKEN = raw_input("Please enter your PivotalTracker API token: ")
+
+    write_to_config_file({"GITHUB_API_TOKEN": GITHUB_API_TOKEN, "PIVOTAL_TRACKER_API_TOKEN": PIVOTAL_TRACKER_API_TOKEN})
+
     sys.exit(main(parse_arguments()))
