@@ -29,17 +29,9 @@ and you are good to go 🎉
 
 In the first run, `prh` is going to setup some configurations. The setup is also accessable from `prh setup` command
 
-Create a github token if you don't have already with following permissions:
+####Where to find PivotalTracker API token from? https://www.pivotaltracker.com/help/articles/api_token/
+####What permissions are needed for GitHub Api token? 
 ![permissions](\permissions.png)
-
-you are good to go :)
-
-## Config
-`DEFAULT_COMMIT_MESSAGE` A default message for commits if `-m` is not used<br>
-`DEFAULT_PULL_REQUEST_BODY` A default message for Pull-Request body (like a template), the content of `-pb` will be appended to this<br>
-`PIVOTAL_TRACKER_API_TOKEN` An API token for Pivotal tracker that can be found in your Pivotal Tracker Profile section<br>
-`PIVOTAL_TRACKER_PROJECT_ID` The project id for your pivotal tracker<br>
-
 
 ## Usage
 usage: prh [-h] [-v] [--verbose [VERBOSE]] [-d [DEBUG]] [-s [STAY_ON]]<br>
