@@ -275,6 +275,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         print "run prh setup first"
         return 1
 
+    # https://developer.github.com/v3/pulls/#create-a-pull-request
     github = "https://api.github.com"
     api = "{}/repos/{}/{}/pulls".format(github, owner, repo)
     data = {
@@ -285,7 +286,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
     }
     headers = {"Authorization": "token " + GITHUB_API_TOKEN}
     res = requests.post(api, data=json.dumps(data), headers=headers)
-    pr_url = res.json()["url"]
+    pr_url = res.json()["html_url"]
 
     if pr_url and str(pr_url)[:4] == "http":
         launch_browser(pr_url)
