@@ -6,7 +6,8 @@ import subprocess
 import sys
 
 import requests
-
+sys.path.append(os.path.abspath("config_file_path"))
+import prh_config
 import argparse
 import importlib
 
@@ -548,8 +549,6 @@ def write_to_config_file(dic):
 
 
 if __name__ == "__main__":
-    prh_config = importlib.import_module(PRH_CONFIG_FILE_NAME, prh_config_file)
-
     DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
     DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
     PIVOTAL_TRACKER_API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
