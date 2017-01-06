@@ -545,7 +545,7 @@ def parse_arguments():
 def write_to_config_file(dic):
     with open(prh_config_file + PRH_CONFIG_FILE_NAME+".py", mode='w') as f:
         for key in dic:
-            f.write(key + "=" + dic[key] + "\n")
+            f.write(key + "=\"" + dic[key] + "\"\n")
 
 
 if __name__ == "__main__":
