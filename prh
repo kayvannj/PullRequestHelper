@@ -6,10 +6,10 @@ import subprocess
 import sys
 
 import requests
+
 sys.path.append(os.path.abspath("config_file_path"))
 import prh_config
 import argparse
-import importlib
 
 PRH_CONFIG_FILE_NAME = "prh_config"
 
@@ -482,6 +482,7 @@ def setup():
     repo = fetch_url.split(":")[-1].split("/")[1].split(".")[0]
     write_to_setup_file(owner, repo)
 
+
 def run_popen(command):
     popen = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, stdout=subprocess.PIPE)
     with popen.stdout as output:
@@ -499,7 +500,7 @@ def write_to_setup_file(owner, repo):
 def read_from_setup_file():
     command = ["git rev-parse --show-toplevel"]
     repo_root_path = run_popen(command)
-    if os.path.exists(repo_root_path+'/.prh'):
+    if os.path.exists(repo_root_path + '/.prh'):
         with open(repo_root_path + '/.prh', 'r') as f:
             line = f.readline()
             return line.split("/")
@@ -543,7 +544,7 @@ def parse_arguments():
 
 
 def write_to_config_file(dic):
-    with open(prh_config_file + PRH_CONFIG_FILE_NAME+".py", mode='w') as f:
+    with open(prh_config_file + PRH_CONFIG_FILE_NAME + ".py", mode='w') as f:
         for key in dic:
             f.write(key + "=\"" + dic[key] + "\"\n")
 
@@ -557,11 +558,22 @@ if __name__ == "__main__":
     setup_config = read_from_setup_file()
     if not setup_config:
         setup()
+
+    config_changed = 0
     if not GITHUB_API_TOKEN:
+        config_changed = 1
         GITHUB_API_TOKEN = raw_input("Please enter your Github API token: ")
     if not PIVOTAL_TRACKER_API_TOKEN:
+        config_changed = 1
         PIVOTAL_TRACKER_API_TOKEN = raw_input("Please enter your PivotalTracker API token: ")
 
-    write_to_config_file({"GITHUB_API_TOKEN": GITHUB_API_TOKEN, "PIVOTAL_TRACKER_API_TOKEN": PIVOTAL_TRACKER_API_TOKEN})
+    if config_changed:
+        write_to_config_file({
+            "GITHUB_API_TOKEN": GITHUB_API_TOKEN,
+            "PIVOTAL_TRACKER_API_TOKEN": PIVOTAL_TRACKER_API_TOKEN,
+            "DEFAULT_COMMIT_MESSAGE": "Commit",
+            "DEFAULT_PULL_REQUEST_BODY": "",
+            "SLACK_INTEGRATION_URL": ""
+        })
 
     sys.exit(main(parse_arguments()))
