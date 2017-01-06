@@ -18,23 +18,20 @@ your project id and api token and then all you need to do is to post a link to
 your story in the ```-m``` option along side of your commit message and prh will mark the 
 story finished and link PR to the story.  
 <br>
-## Dependency
-python 2.7 https://www.python.org/download/releases/2.7/<br>
-requests (python lib) http://docs.python-requests.org/en/master/user/install/#install<br>
-hub https://github.com/github/hub<br>
-
 ## Install
+Now you can install prh simply by using
+
+```
+brew tap kayvannj/prh
+brew install prh
+```
+and you are good to go 🎉 
+
+In the first run, `prh` is going to setup some configurations. The setup is also accessable from `prh setup` command
 
 Create a github token if you don't have already with following permissions:
 ![permissions](\permissions.png)
 
-then run the following commands
-```bash
-git clone git@github.com:kayvannj/PullRequestHelper.git
-cd PullRequestHelper
-chmod +x install.sh
-sudo ./install.sh <github-username> <github-token>
-```
 you are good to go :)
 
 ## Config
@@ -43,17 +40,10 @@ you are good to go :)
 `PIVOTAL_TRACKER_API_TOKEN` An API token for Pivotal tracker that can be found in your Pivotal Tracker Profile section<br>
 `PIVOTAL_TRACKER_PROJECT_ID` The project id for your pivotal tracker<br>
 
-## Options
-if `-a`  is not used, prh will add all the changed files using `git add -A`<br>
 
-`-b` branch: the new branch name for this PR<br>
-`-sb` sub-branch: this option will append your given subbranch name to the name of current branch and use that as the new branch name, ex: when `current branch = v1`, using `-sb testing` will create new branch with name `v1_testing`
-`-upto` the parent branch to make a PR into
-`-a`  to add only specified file into the PR<br>
-`-m`  to add a comment message<br>
-`-pt` to customize the PullRequest Title<br>
-`-pb` to append a message to the PullRequest body<br>
-`-d`  run in debug mode which means not executing commands and just printing them<br>
-`-v`  run in verbose mode<br>
-`-h`  show help<br>
-`--version` print the version of the app<br>
+## Usage
+usage: prh [-h] [-v] [--verbose [VERBOSE]] [-d [DEBUG]] [-s [STAY_ON]]<br>
+           [-b [BRANCH]] [-sb [SUB_BRANCH]] [-pb [PR_BODY]] [-pt [PR_TITLE]]<br>
+           [-a [ADD [ADD ...]]] [-e [EMPTY]] [-upto [UPTO]] [-sub [SUB]]<br>
+           [-m [MESSAGE]] [-l [LOCAL]]<br>
+           [setup]<br>
