@@ -1,42 +1,21 @@
 #!/usr/bin/env python
+import json
+import os
 import re
 import subprocess
 import sys
-import json
-from pip._vendor import requests
 
-import prh_config
-import os
-import pivotal_tracker
+import requests
+
+import argparse
+import importlib
 
 APP_VERSION = "1.0.5"
 
-USEAGE = """
-    You can use prh in three main ways:<br>
-    1) create a pr from a new branch to current branch
-        prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]
-    2) create a pr from current branch to a different branch
-        prh -upto <parent_branch_name>
-    3) create a pr from a new branch to a different branch
-        prh -b <child_branch_name> -upto <parent_branch_name>
-
-
-    if -a  is not used, prh will add all the changed files using 'git add -A'
-
-    -a  to add only specified file into the PR
-        or if no file mentioned will not add any file and just create a pr for existing commits
-    -m  to add a comment message
-    -pt to customize the PullRequest Title
-    -pb to append a message to the PullRequest body
-    -d  run in debug mode which means not executing commands and just printing them
-    -v  run in verbose mode
-    -s  stay on current branch
-    -h  show help
-    -l  local only, do not push changes
-    --version print the version of the app
-"""
-DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
-DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
+DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
+DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
+PIVOTAL_TRACKER_API_TOKEN = ""  # prh_config.PIVOTAL_TRACKER_API_TOKEN
+GITHUB_API_TOKEN = ""
 pivotal_tracker_story_id = ""
 pivotal_tracker_story_url = ""
 debug_is_on = 0
@@ -45,6 +24,73 @@ local_only_is_on = 0
 stay_is_on = 0
 is_just_pr = 0
 is_in_submodule = 0
+prh_config_file = "config_file_path"
+
+base_endpoint = "https://www.pivotaltracker.com/services/v5"
+story = ""
+
+
+def get(api):
+    response = requests.get(api, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
+    # print(api, response.status_code)
+    return response
+
+
+def post(api, data):
+    response = requests.post(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
+    # print(api, response.status_code)
+    return response
+
+
+def put(api, data):
+    response = requests.put(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
+    # print(api, response.status_code)
+    return response
+
+
+def get_story(story_id):
+    global story
+    if story:
+        return story
+
+    api = "{}/stories/{}".format(base_endpoint, story_id)
+    resp = get(api)
+    story = resp.json()
+    return story
+
+
+def mark_story_finished(project_id, story_id):
+    api = "{}/projects/{}/stories/{}".format(base_endpoint, project_id, story_id)
+    resp = put(api, {"current_state": "finished"})
+    return resp.json()
+
+
+def post_comment(project_id, story_id, text):
+    api = "{}/projects/{}/stories/{}/comments".format(base_endpoint, project_id, story_id)
+    resp = post(api, {"text": text})
+    return resp.json()
+
+
+def get_project_id(story_id):
+    global story
+    if story:
+        return story["project_id"]
+
+    api = "{}/stories/{}".format(base_endpoint, story_id)
+    resp = get(api)
+    story = resp.json()
+    return story["project_id"]
+
+
+def finish_and_post_message(story_id, message):
+    project_id = get_project_id(story_id)
+    if not PIVOTAL_TRACKER_API_TOKEN:
+        return 1
+    if not mark_story_finished(project_id, story_id):
+        return 1
+    if not post_comment(project_id, story_id, message):
+        return 1
+    return 0
 
 
 def run_command(command, output=0):
@@ -183,10 +229,10 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
         return 0
     if not commit_message:
         if pivotal_tracker_story_id:
-            story_json = pivotal_tracker.get_story(pivotal_tracker_story_id)
+            story_json = get_story(pivotal_tracker_story_id)
             commit_message = story_json["name"]
         else:
-            commit_message = prh_config.DEFAULT_COMMIT_MESSAGE
+            commit_message = DEFAULT_COMMIT_MESSAGE
 
     command = ["git", "commit", "-m", commit_message]
     res = run_command(command)
@@ -203,13 +249,6 @@ def push(branch_name):
 
 
 def create_pull_request(from_branch, to_branch, pr_title, pr_body):
-    command = ["git remote show origin | grep \"Fetch URL\""]
-    popen = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True,
-                             stdout=subprocess.PIPE)
-    fetch_url = str(popen.communicate()[0]).strip("\n")
-    # Fetch URL: git@github.com:doximity/Android.git
-    owner = fetch_url.split(":")[-1].split("/")[0]
-    repo = fetch_url.split(":")[-1].split("/")[1].split(".")[0]
     if local_only_is_on:
         return 0
 
@@ -221,12 +260,16 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
 
     if pivotal_tracker_story_url:
-        description = pivotal_tracker.get_story(pivotal_tracker_story_id)["description"]
-        name = pivotal_tracker.get_story(pivotal_tracker_story_id)["name"]
+        description = get_story(pivotal_tracker_story_id)["description"]
+        name = get_story(pivotal_tracker_story_id)["name"]
         pr_body = pr_body + "\n\n**Story:** [" + name + "](" + pivotal_tracker_story_url + ")\n" + description
 
-    # command = ["hub", "pull-request", "-b", to_branch, "-h", from_branch, "-m", pr_title + "\n" + pr_body]
-    # pr_url = run_command(command, 1)
+    owner, repo = read_from_setup_file()
+
+    if not owner:
+        print "run prh setup first"
+        return 1
+
     github = "https://api.github.com"
     api = "{}/repos/{}/{}/pulls".format(github, owner, repo)
     data = {
@@ -235,14 +278,14 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         "head": from_branch,
         "base": to_branch
     }
-    headers = {"Authorization": "token " + prh_config.GITHUB_API_TOKEN}
+    headers = {"Authorization": "token " + GITHUB_API_TOKEN}
     res = requests.post(api, data=json.dumps(data), headers=headers)
     pr_url = res.json()["url"]
 
     if pr_url and str(pr_url)[:4] == "http":
         launch_browser(pr_url)
         if pivotal_tracker_story_id:
-            if pivotal_tracker.finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
+            if finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
                 print "error with pivotal"
 
         return 0
@@ -319,7 +362,7 @@ def revert_all(branch_origin, branch_child, branch_parent, is_add_all, file_path
         return "Failed to check out original branch"
 
 
-def main():
+def main(args):
     branch_child = ""
     pr_title = ""
     pr_body = ""
@@ -330,37 +373,37 @@ def main():
     submodule = 0
     branch_origin = get_current_branch()
     is_add_all = False
-    if "--version" in sys.argv:
-        print APP_VERSION
+
+    if args.setup:
+        setup()
         return
 
-    if "-debug" in sys.argv or "-d" in sys.argv:
+    if args.debug:
         global debug_is_on
         debug_is_on = 1
 
-    if "-v" in sys.argv:
+    if args.verbose:
         global verbose_is_on
         verbose_is_on = 1
 
-    if "-s" in sys.argv:
+    if args.stay_on:
         global stay_is_on
         stay_is_on = 1
 
-    if "-b" in sys.argv:
-        branch_child = sys.argv[sys.argv.index("-b") + 1]
+    if args.branch:
+        branch_child = args.branch
 
-    if "-sb" in sys.argv:
-        branch_child = branch_origin + "_" + sys.argv[sys.argv.index("-sb") + 1]
+    if args.sub_branch:
+        branch_child = branch_origin + "_" + args.sub_branch
 
-    if "-pb" in sys.argv:
-        pr_body = sys.argv[sys.argv.index("-pb") + 1]
+    if args.pr_body:
+        pr_body = args.pr_body
 
-    if "-pt" in sys.argv:
-        pr_title = sys.argv[sys.argv.index("-pt") + 1]
+    if args.pr_title:
+        pr_title = args.pr_title
 
-    if "-a" in sys.argv:
-        key_index = sys.argv.index("-a")
-        for p in sys.argv[key_index + 1:]:
+    if args.add:
+        for p in args.add:
             if os.path.exists(p):
                 file_paths.append(p)
             else:
@@ -368,14 +411,14 @@ def main():
     else:
         is_add_all = True
 
-    if "-upto" in sys.argv:
-        branch_parent = sys.argv[sys.argv.index("-upto") + 1]
+    if args.upto:
+        branch_parent = args.upto
 
-    if "-sub" in sys.argv:
+    if args.sub:
         submodule = 1
 
-    if "-m" in sys.argv:
-        commit_message = str(sys.argv[sys.argv.index("-m") + 1])
+    if args.message:
+        commit_message = args.message
         re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
 
         if re_search:
@@ -387,7 +430,7 @@ def main():
             pivotal_tracker_story_url = full_url
             commit_message = commit_message.replace(full_url, "")
 
-    if "-l" in sys.argv:
+    if args.local:
         global local_only_is_on
         local_only_is_on = 1
 
@@ -395,10 +438,6 @@ def main():
         cd(get_submodule_name())
         global is_in_submodule
         is_in_submodule = 1
-
-    if not branch_child and not branch_parent:
-        print USEAGE
-        return
 
     if branch_child and not branch_parent:
         print process_from_child(branch_origin, branch_child, is_add_all, file_paths, commit_message, pr_title, pr_body)
@@ -413,5 +452,99 @@ def main():
         return
 
 
+def setup():
+    print "Running setup"
+
+    with open(".git/config") as git_config:
+        is_in_origin = False
+        for line in git_config.readlines():
+            if '[remote "origin"]' in line:
+                is_in_origin = True
+            if is_in_origin and 'url' in line:
+                fetch_url = line.split('=')[1].strip()
+                break
+
+    if not fetch_url:
+        print "Could not find origin url in the .git/config file"
+        return
+
+    # git@github.com:doximity/Android.git
+    owner = fetch_url.split(":")[-1].split("/")[0]
+    repo = fetch_url.split(":")[-1].split("/")[1].split(".")[0]
+    write_to_setup_file(owner, repo)
+    print "Finished. enjoy using PRH"
+
+
+def run_popen(command):
+    popen = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, stdout=subprocess.PIPE)
+    with popen.stdout as output:
+        return output.readline().replace("\n", "")
+    return '.'
+
+
+def write_to_setup_file(owner, repo):
+    command = ["git rev-parse --show-toplevel"]
+    repo_root_path = run_popen(command)
+    with open(repo_root_path + '/.prh', 'w') as f:
+        f.write(owner + "/" + repo)
+
+
+def read_from_setup_file():
+    command = ["git rev-parse --show-toplevel"]
+    repo_root_path = run_popen(command)
+    with open(repo_root_path + '/.prh', 'r') as f:
+        line = f.readline()
+        return line.split("/")
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="You can use prh in three main ways:<br>\n1) create a pr from a new branch to current branch\n"
+                    "prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]\n"
+                    "2) create a pr from current branch to a different branch\n"
+                    "prh -upto <parent_branch_name>\n"
+                    "3) create a pr from a new branch to a different branch\n"
+                    "prh -b <child_branch_name> -upto <parent_branch_name>", version=APP_VERSION)
+    parser.add_argument("--verbose", help="run in verbose mode", const=True, nargs='?')
+    parser.add_argument("-d", "--debug", help="run in debug mode", const=True, nargs='?')
+    parser.add_argument("-s", "--stay_on", help="come back to current branch after all is done", const=True, nargs='?')
+    parser.add_argument("-b", "--branch", help="Name of child branch", nargs='?')
+    parser.add_argument("-sb", "--sub_branch", help="Name of child branch appended to the name of parent branch",
+                        nargs='?')
+    parser.add_argument("-pb", "--pr_body", help="Overwrite PullRequest Body text", nargs='?')
+    parser.add_argument("-pt", "--pr_title", help="OverWrite PullRequest Title text", nargs='?')
+    parser.add_argument("-a", "--add",
+                        help="Add files with given path, use with no paths to not add anything, not using the option will add all files",
+                        nargs='*')
+    parser.add_argument("-upto", "--upto", help="Name of the parent branch that this PR should point to", nargs='?')
+    parser.add_argument("-sub", "--sub", help="", const=True, nargs='?')
+    parser.add_argument("-m", "--message",
+                        help="Overwrite commit message or add a Pivotal Tracker story link to fetch all the details from the story",
+                        nargs='?')
+    parser.add_argument("-l", "--local",
+                        help="Do not push any changes or create a PR, only create the branch and make the commit",
+                        const=True, nargs='?')
+    parser.add_argument("setup", help="Setup the pull-request helper", const=True, nargs='?')
+
+    args = parser.parse_args()
+
+    if not args.branch and not args.upto and not args.sub_branch and not args.setup:
+        parser.print_help()
+
+    return args
+
+
 if __name__ == "__main__":
-    main()
+    prh_config = importlib.import_module("prh_config", prh_config_file)
+    global DEFAULT_COMMIT_MESSAGE
+    DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
+    global DEFAULT_PR_BODY
+    DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
+    global PIVOTAL_TRACKER_API_TOKEN
+    PIVOTAL_TRACKER_API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
+    global GITHUB_API_TOKEN
+    GITHUB_API_TOKEN = prh_config.GITHUB_API_TOKEN
+
+    if not GITHUB_API_TOKEN:
+        GITHUB_API_TOKEN = input("Please enter your Github API token:")
+    sys.exit(main(parse_arguments()))
