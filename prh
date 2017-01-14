@@ -31,25 +31,31 @@ is_just_pr = 0
 is_in_submodule = 0
 prh_config_file = "config_file_path/"
 
-base_endpoint = "https://www.pivotaltracker.com/services/v5"
+pivotal_tracker_api_endpoint = "https://www.pivotaltracker.com/services/v5"
 story = ""
 
 
 def get(api):
     response = requests.get(api, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    # print(api, response.status_code)
+    if verbose_is_on:
+        print "-->", api
+        print "<--", response.json(), "\n"
     return response
 
 
 def post(api, data):
     response = requests.post(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    # print(api, response.status_code)
+    if verbose_is_on:
+        print "-->", api
+        print "<--", response.json(), "\n"
     return response
 
 
 def put(api, data):
     response = requests.put(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    # print(api, response.status_code)
+    if verbose_is_on:
+        print "-->", api
+        print "<--", response.json(), "\n"
     return response
 
 
@@ -58,20 +64,20 @@ def get_story(story_id):
     if story:
         return story
 
-    api = "{}/stories/{}".format(base_endpoint, story_id)
+    api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
     resp = get(api)
     story = resp.json()
     return story
 
 
 def mark_story_finished(project_id, story_id):
-    api = "{}/projects/{}/stories/{}".format(base_endpoint, project_id, story_id)
+    api = "{}/projects/{}/stories/{}".format(pivotal_tracker_api_endpoint, project_id, story_id)
     resp = put(api, {"current_state": "finished"})
     return resp.json()
 
 
 def post_comment(project_id, story_id, text):
-    api = "{}/projects/{}/stories/{}/comments".format(base_endpoint, project_id, story_id)
+    api = "{}/projects/{}/stories/{}/comments".format(pivotal_tracker_api_endpoint, project_id, story_id)
     resp = post(api, {"text": text})
     return resp.json()
 
@@ -81,7 +87,7 @@ def get_project_id(story_id):
     if story:
         return story["project_id"]
 
-    api = "{}/stories/{}".format(base_endpoint, story_id)
+    api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
     resp = get(api)
     story = resp.json()
     return story["project_id"]
@@ -117,7 +123,7 @@ def run_command(command, output=0):
             else:
                 run_output = subprocess.check_call(command)
             if verbose_is_on:
-                print "\nOUTPUT:\t" + str(run_output) + "\n"
+                print "\nOUTPUT:\t" + str(run_output)
             return run_output
         except subprocess.CalledProcessError as e:
             return e.returncode
@@ -163,7 +169,7 @@ def get_one_switch_value(switch_key):
 
 
 def launch_browser(url):
-    command = ["open", url[:-1] if url else ""]
+    command = ["open", url if url else ""]
     run_command(command)
 
 
@@ -255,6 +261,13 @@ def push(branch_name):
     return res
 
 
+def find_existing_pr(owner, repo, head, base):
+    api = "https://api.github.com/repos/{}/{}/pulls".format(owner, repo)
+    res = github_api_get(api)
+    if res.status_code < 300:
+        return [a for a in res.json()[:] if a["head"]["ref"] == head and a["base"]["ref"] == base][0]["html_url"]
+
+
 def create_pull_request(from_branch, to_branch, pr_title, pr_body):
     if local_only_is_on:
         return 0
@@ -271,8 +284,9 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         name = get_story(pivotal_tracker_story_id)["name"]
         pr_body = pr_body + "\n\n**Story:** [" + name + "](" + pivotal_tracker_story_url + ")\n" + description
 
-    owner, repo = read_from_setup_file()
-
+    setup_config_dic = read_from_setup_file()
+    owner = setup_config_dic["owner"]
+    repo = setup_config_dic["repo"]
     if not owner:
         print "run prh setup first"
         return 1
@@ -286,21 +300,43 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         "head": from_branch,
         "base": to_branch
     }
+    res = github_api_post(api, data)
+
+    if res.status_code == 201:
+        pr_url = res.json()["html_url"]
+        print "PR created: {}".format(pr_url)
+        if pr_url and str(pr_url)[:4] == "http":
+            launch_browser(pr_url)
+            if pivotal_tracker_story_id:
+                if finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
+                    print "error with pivotal"
+        return 0
+    else:
+        existing_pr_url = find_existing_pr(owner, repo, from_branch, to_branch)
+        if existing_pr_url:
+            print existing_pr_url
+            launch_browser(existing_pr_url)
+            return 0
+        print "Failed to create the PR"
+        return 1
+
+
+def github_api_post(api, data):
     headers = {"Authorization": "token " + GITHUB_API_TOKEN}
     res = requests.post(api, data=json.dumps(data), headers=headers)
-    pr_url = res.json()["html_url"]
+    if verbose_is_on:
+        print "-->", api
+        print "<--", res.json(), "\n"
+    return res
 
-    if pr_url and str(pr_url)[:4] == "http":
-        launch_browser(pr_url)
-        if pivotal_tracker_story_id:
-            if finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
-                print "error with pivotal"
 
-        return 0
-    elif pr_url:
-        return 1
-    else:
-        return 1
+def github_api_get(api):
+    headers = {"Authorization": "token " + GITHUB_API_TOKEN}
+    res = requests.post(api, headers=headers)
+    if verbose_is_on:
+        print "-->", api
+        print "<--", res.json(), "\n"
+    return res
 
 
 def process_from_child(origin, new, is_add_all, file_paths, commit_message, pr_title, pr_body):
@@ -428,7 +464,13 @@ def main(args):
         branch_parent = args.upto
 
     if args.sub:
-        submodule = 1
+        setup_file = read_from_setup_file()
+        for pair in setup_file["submodules"]:
+            if os.path.exists(pair):
+                cd(pair)
+                submodule_args = args
+                submodule_args["sub"] = 0
+                main(submodule_args)
 
     if args.message:
         commit_message = args.message
@@ -447,11 +489,6 @@ def main(args):
         global local_only_is_on
         local_only_is_on = 1
 
-    if submodule:
-        cd(get_submodule_name())
-        global is_in_submodule
-        is_in_submodule = 1
-
     if branch_child and not branch_parent:
         print process_from_child(branch_origin, branch_child, is_add_all, file_paths, commit_message, pr_title, pr_body)
     elif branch_parent and not branch_child:
@@ -466,29 +503,29 @@ def main(args):
 
 
 def setup():
-    print "Running setup"
+    setup_config = read_from_setup_file()
+    if setup_config:
+        return 0
 
+    print "Running setup"
+    submodules = []
+    remotes = []
     if os.path.exists(GIT_CONFIG_PATH):
         with open(GIT_CONFIG_PATH) as git_config:
-            is_in_origin = False
-            for line in git_config.readlines():
-                if '[remote "origin"]' in line:
-                    is_in_origin = True
-                if is_in_origin and 'url' in line:
-                    fetch_url = line.split('=')[1].strip()
-                    break
+            config_string = git_config.read()
+
+            remotes = re.findall('\[remote "(.*)"\].*\n.*url = (git.*\.git).*', config_string)
+            submodules = re.findall('\[submodule "(.*)"\]\n.*url = (.*).*', config_string)
+
     else:
         print "You should run prh from a git repository directory"
         return
 
-    if not fetch_url:
+    if not remotes:
         print "Could not find origin url in the .git/config file"
         return
 
-    # git@github.com:doximity/Android.git
-    owner = fetch_url.split(":")[-1].split("/")[0]
-    repo = fetch_url.split(":")[-1].split("/")[1].split(".")[0]
-    write_to_setup_file(owner, repo)
+    write_to_setup_file(remotes, submodules)
 
 
 def run_popen(command):
@@ -498,11 +535,47 @@ def run_popen(command):
     return '.'
 
 
-def write_to_setup_file(owner, repo):
+def get_owner(git_url):
+    """
+        >>> get_owner("git@github.com:doximity/Android.git")
+        doximity
+    """
+    return git_url.split(":")[-1].split("/")[0]
+
+
+def get_repo(git_url):
+    """
+        >>> get_repo("git@github.com:doximity/Android.git")
+        Android
+    """
+
+    return git_url.split(":")[-1].split("/")[1].split(".")[0]
+
+
+def write_to_setup_file(remotes, submodules):
+    # git@github.com:doximity/Android.git
+    index = 1
+    if len(remotes) > 2:
+        for i, j in remotes:
+            print "%d : %s = %s" % (index, i, j)
+            index += 1
+        selected_remote_index = raw_input("Which remote to use (enter line number)?")
+
+        owner = get_owner(remotes[int(selected_remote_index) - 1][1])
+        repo = get_repo(remotes[int(selected_remote_index) - 1][1])
+    else:
+        owner = get_owner(remotes[1])
+        repo = get_repo(remotes[1])
+
+    submodules_dic = {}
+    for submodule in submodules:
+        submodules_dic[submodule[0]] = submodule[1]
+
     command = ["git rev-parse --show-toplevel"]
     repo_root_path = run_popen(command)
+    out = json.dumps({"owner": owner, "repo": repo, "submodules": submodules_dic})
     with open(repo_root_path + '/.prh', 'w') as f:
-        f.write(owner + "/" + repo)
+        f.write(out)
 
 
 def read_from_setup_file():
@@ -510,8 +583,7 @@ def read_from_setup_file():
     repo_root_path = run_popen(command)
     if os.path.exists(repo_root_path + '/.prh'):
         with open(repo_root_path + '/.prh', 'r') as f:
-            line = f.readline()
-            return line.split("/")
+            return json.load(f)
 
 
 def parse_arguments():
