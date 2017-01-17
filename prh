@@ -7,15 +7,17 @@ import sys
 
 import requests
 
-sys.path.append(os.path.abspath("config_file_path"))
+REPO_PATH = ""  # for debug purposes
+PRH_CONFIG_PATH = "config_file_path"
+
+sys.path.append(os.path.abspath(PRH_CONFIG_PATH))
 import prh_config
 import argparse
 
-PRH_CONFIG_FILE_NAME = "prh_config"
-
-GIT_CONFIG_PATH = ".git/config"
-
-APP_VERSION = "2.0.0"
+PRH_CONFIG_FILE_NAME = "/prh_config"
+GIT_CONFIG_PATH = "/config"
+GIT_FILE_PATH = "/.git"
+APP_VERSION = "2.0.1"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -29,33 +31,34 @@ local_only_is_on = 0
 stay_is_on = 0
 is_just_pr = 0
 is_in_submodule = 0
-prh_config_file = "config_file_path/"
-
+repo_path = ""
 pivotal_tracker_api_endpoint = "https://www.pivotaltracker.com/services/v5"
 story = ""
 
 
+def log(message):
+    if verbose_is_on:
+        print message
+
+
 def get(api):
     response = requests.get(api, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    if verbose_is_on:
-        print "-->", api
-        print "<--", response.json(), "\n"
+    log("--> %s" % api)
+    log("<-- %s\n" % response.json())
     return response
 
 
 def post(api, data):
     response = requests.post(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    if verbose_is_on:
-        print "-->", api
-        print "<--", response.json(), "\n"
+    log("--> %s" % api)
+    log("<-- %s\n" % response.json())
     return response
 
 
 def put(api, data):
     response = requests.put(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    if verbose_is_on:
-        print "-->", api
-        print "<--", response.json(), "\n"
+    log("--> %s" % api)
+    log("<-- %s\n" % response.json())
     return response
 
 
@@ -122,15 +125,15 @@ def run_command(command, output=0):
                 run_output = subprocess.check_output(command)
             else:
                 run_output = subprocess.check_call(command)
-            if verbose_is_on:
-                print "\nOUTPUT:\t" + str(run_output)
+
+            log("\nOUTPUT:\t" + str(run_output))
             return run_output
         except subprocess.CalledProcessError as e:
             return e.returncode
 
 
 def print_command(command):
-    print get_current_branch() + " >>> " + reduce(lambda x, y: x + " " + y, command)
+    print get_head() + " >>> " + reduce(lambda x, y: x + " " + y, command)
 
 
 def checkout(branch_name):
@@ -148,10 +151,24 @@ def add_all():
     return run_command(command, 1)
 
 
-def get_current_branch():
-    popen = subprocess.Popen("git status | head -n 1 | cut -f 3 -d ' '", stdin=subprocess.PIPE, shell=True,
-                             stdout=subprocess.PIPE)
-    return str(popen.communicate()[0]).strip("\n")
+def get_head():
+    # read the head from git dir
+    with open(get_repo_git_dir() + "/HEAD") as f:
+        ref = f.read()
+        return ref.split("/")[-1]
+
+
+def get_repo_git_dir():
+    git_config_dir_path = repo_path + GIT_FILE_PATH
+    if os.path.isfile(git_config_dir_path):
+        with open(git_config_dir_path) as f:
+            line = f.readline()
+            # gitdir: ../.git/modules/dxCore
+            git_dir_path = line.split(":")[1].strip()
+            git_config_dir_path = repo_path + "/" + git_dir_path
+            log(git_config_dir_path)
+
+    return git_config_dir_path
 
 
 def get_submodule_name():
@@ -273,7 +290,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         return 0
 
     if not pr_title:
-        pr_title = get_current_branch().replace("_", " ")
+        pr_title = get_head().replace("_", " ")
     if not pr_body:
         pr_body = DEFAULT_PR_BODY
     else:
@@ -323,20 +340,18 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
 
 def github_api_post(api, data):
     headers = {"Authorization": "token " + GITHUB_API_TOKEN}
-    res = requests.post(api, data=json.dumps(data), headers=headers)
-    if verbose_is_on:
-        print "-->", api
-        print "<--", res.json(), "\n"
-    return res
+    response = requests.post(api, data=json.dumps(data), headers=headers)
+    log("--> %s" % api)
+    log("<-- %s\n" % response.json())
+    return response
 
 
 def github_api_get(api):
     headers = {"Authorization": "token " + GITHUB_API_TOKEN}
-    res = requests.post(api, headers=headers)
-    if verbose_is_on:
-        print "-->", api
-        print "<--", res.json(), "\n"
-    return res
+    response = requests.post(api, headers=headers)
+    log("--> %s" % api)
+    log("<-- %s\n" % response.json())
+    return response
 
 
 def process_from_child(origin, new, is_add_all, file_paths, commit_message, pr_title, pr_body):
@@ -415,7 +430,7 @@ def main(args):
     branch_parent = ""
     commit_message = ""
     submodule = 0
-    branch_origin = get_current_branch()
+    branch_origin = get_head()
     is_add_all = False
 
     if args.setup:
@@ -508,15 +523,14 @@ def setup():
         return 0
 
     print "Running setup"
-    submodules = []
     remotes = []
-    if os.path.exists(GIT_CONFIG_PATH):
-        with open(GIT_CONFIG_PATH) as git_config:
+
+    git_dir = get_repo_git_dir()
+    if os.path.isdir(git_dir):
+        with open(git_dir + GIT_CONFIG_PATH) as git_config:
             config_string = git_config.read()
-
             remotes = re.findall('\[remote "(.*)"\].*\n.*url = (git.*\.git).*', config_string)
-            submodules = re.findall('\[submodule "(.*)"\]\n.*url = (.*).*', config_string)
-
+            # submodules = re.findall('\[submodule "(.*)"\]\n.*url = (.*).*', config_string)
     else:
         print "You should run prh from a git repository directory"
         return
@@ -525,7 +539,7 @@ def setup():
         print "Could not find origin url in the .git/config file"
         return
 
-    write_to_setup_file(remotes, submodules)
+    write_to_setup_file(remotes)
 
 
 def run_popen(command):
@@ -552,37 +566,37 @@ def get_repo(git_url):
     return git_url.split(":")[-1].split("/")[1].split(".")[0]
 
 
-def write_to_setup_file(remotes, submodules):
+def write_to_setup_file(remotes):
     # git@github.com:doximity/Android.git
     index = 1
+    selected_remote_index = '1'
     if len(remotes) > 2:
         for i, j in remotes:
             print "%d : %s = %s" % (index, i, j)
             index += 1
         selected_remote_index = raw_input("Which remote to use (enter line number)?")
 
-        owner = get_owner(remotes[int(selected_remote_index) - 1][1])
-        repo = get_repo(remotes[int(selected_remote_index) - 1][1])
-    else:
-        owner = get_owner(remotes[1])
-        repo = get_repo(remotes[1])
+    owner = get_owner(remotes[int(selected_remote_index) - 1][1])
+    repo = get_repo(remotes[int(selected_remote_index) - 1][1])
 
     submodules_dic = {}
-    for submodule in submodules:
-        submodules_dic[submodule[0]] = submodule[1]
+    # for submodule in submodules:
+    #     submodules_dic[submodule[0]] = submodule[1]
 
-    command = ["git rev-parse --show-toplevel"]
-    repo_root_path = run_popen(command)
+    # command = ["git rev-parse --show-toplevel"]
+    # repo_root_path = run_popen(command)
     out = json.dumps({"owner": owner, "repo": repo, "submodules": submodules_dic})
-    with open(repo_root_path + '/.prh', 'w') as f:
+    with open(repo_path + '/.prh', 'w') as f:
         f.write(out)
 
 
 def read_from_setup_file():
-    command = ["git rev-parse --show-toplevel"]
-    repo_root_path = run_popen(command)
-    if os.path.exists(repo_root_path + '/.prh'):
-        with open(repo_root_path + '/.prh', 'r') as f:
+    """
+    Read the REPO Scoped config file of PRH
+    :return:
+    """
+    if os.path.exists(repo_path + '/.prh'):
+        with open(repo_path + '/.prh', 'r') as f:
             return json.load(f)
 
 
@@ -629,7 +643,12 @@ def parse_arguments():
 
 
 def write_to_config_file(dic):
-    with open(prh_config_file + PRH_CONFIG_FILE_NAME + ".py", mode='w') as f:
+    """
+    write to the user scoped config file for PRH
+    :param dic:
+    :return:
+    """
+    with open(PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py", mode='w') as f:
         for key in dic:
             f.write(key + "=\"" + dic[key] + "\"\n")
 
@@ -639,6 +658,12 @@ if __name__ == "__main__":
     DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
     PIVOTAL_TRACKER_API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
     GITHUB_API_TOKEN = prh_config.GITHUB_API_TOKEN
+
+    if REPO_PATH:
+        repo_path = REPO_PATH
+    else:
+        # get current working dir
+        repo_path = os.getcwd()
 
     setup_config = read_from_setup_file()
     if not setup_config:
