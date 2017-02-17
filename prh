@@ -6,8 +6,8 @@ import subprocess
 import sys
 
 REPO_PATH = ""  # for debug purposes
+# PRH_CONFIG_PATH = "/usr/local/etc"
 PRH_CONFIG_PATH = "config_file_path"
-
 sys.path.append(os.path.abspath(PRH_CONFIG_PATH))
 import prh_config
 import argparse
@@ -664,11 +664,7 @@ def read_from_setup_file():
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="You can use prh in two main ways:<br>\n1) create a pr from a new branch to current branch\n"
-                    "prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]\n"
-                    "2) create a pr from current branch to a different branch\n"
-                    "prh -upto <parent_branch_name>\n", version=APP_VERSION)
+    parser = argparse.ArgumentParser(version=APP_VERSION)
     parser.add_argument("--verbose", help="run in verbose mode", const=True, nargs='?')
     parser.add_argument("-d", "--debug", help="run in debug mode", const=True, nargs='?')
     parser.add_argument("-s", "--stay_on", help="come back to current branch after all is done", const=True, nargs='?')
@@ -685,7 +681,7 @@ def parse_arguments():
                         const=True,
                         nargs='?')
     parser.add_argument("-upto", "--upto", help="Name of the parent branch that this PR should point to", nargs='?')
-    parser.add_argument("-sub", "--sub", help="", const=True, nargs='?')
+    parser.add_argument("-sub", "--sub", help="WIP", const=True, nargs='?')
     parser.add_argument("-m", "--message",
                         help="Overwrite commit message or add a Pivotal Tracker "
                              "story link to fetch all the details from the story",
