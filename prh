@@ -15,7 +15,7 @@ import argparse
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = "/.git"
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.1.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -27,7 +27,6 @@ debug_is_on = 0
 verbose_is_on = 0
 local_only_is_on = 0
 stay_is_on = 0
-is_just_pr = 0
 is_in_submodule = 0
 repo_path = ""
 pivotal_tracker_api_endpoint = "https://www.pivotaltracker.com/services/v5"
@@ -148,12 +147,26 @@ def finish_and_post_message_to_pivotal(story_id, message):
     return 0
 
 
+def run_command_str(command, output=0):
+    command_list = str.split(command)
+    run_command(command_list, output)
+
+
 def run_command(command, output=0):
     """
     run the given command
     :param command:
     :param output:
     :return: 0 if no error occurs or the error code
+
+    >>> run_command(["echo","hello world"],1)
+    'hello world\\n'
+    >>> run_command(["echo","hello world"])
+    0
+    >>> run_command(["ls","buchofjunck"],1)
+    1
+    >>> run_command(["ls","buchofjunck"],0)
+    1
     """
     if debug_is_on:
         print_command(command)
@@ -222,10 +235,6 @@ def get_status():
     return subprocess.check_output(["git", "status"])
 
 
-def get_one_switch_value(switch_key):
-    return sys.argv[sys.argv.index(switch_key) + 1]
-
-
 def launch_browser(url):
     command = ["open", url if url else ""]
     run_command(command)
@@ -236,43 +245,20 @@ def cd(path):
     run_command(command)
 
 
-def ask_if_is_just_pr():
-    answer = raw_input(">>> No file has been added, would you like to continue creating PR (y/n)? ")
-    if str.lower(answer) == 'y':
-        global is_just_pr
-        is_just_pr = 1
-        return 0
-    else:
-        return 1
+def ask_user(question):
+    answer = raw_input(question)
+    return str.lower(answer) == 'y'
 
 
 def add_changes(is_add_all, file_paths):
-    error = 0
-
-    if file_paths:
+    if is_add_all:
+        error = add_all()
+    elif file_paths:
         error = add_files(file_paths)
-
-    elif is_add_all:
-        list_of_changes = str(run_command(["git", "add", "-A", "-n"], 1)).strip()
-        if not list_of_changes:
-            return ask_if_is_just_pr()
-        else:
-            print("\n" + list_of_changes)
-            answer = raw_input(">>> Would you like to apply above changes (y/n)? ")
-            if str.lower(answer) == 'y':
-                error = add_all()
-            else:
-                return 1
     else:
-        if is_just_pr:
-            return 0
-        return ask_if_is_just_pr()
+        error = "Failed to add files"
 
-    if error:
-        print("No files to be added!")
-        return 1
-    else:
-        return 0
+    return error
 
 
 def delete_branch(branch_name):
@@ -290,24 +276,23 @@ def create_branch(branch_name):
             delete_branch(branch_name)
             return create_branch(branch_name)
         else:
-            return 1
+            return "Failed to create the new branch"
     else:
         return res
 
 
 def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
-    if is_just_pr:
-        return 0
     if not commit_message:
         if pivotal_tracker_story_id:
-            story_json = get_story(pivotal_tracker_story_id)
+            story_json = get_pivotal_story(pivotal_tracker_story_id)
             commit_message = story_json["name"]
         else:
             commit_message = DEFAULT_COMMIT_MESSAGE
 
     command = ["git", "commit", "-m", commit_message]
     res = run_command(command)
-    return res
+    if res:
+        return "Failed to commit changes"
 
 
 def push(branch_name):
@@ -316,14 +301,17 @@ def push(branch_name):
 
     command = ["git", "push", "--set-upstream", "origin", branch_name]
     res = run_command(command)
-    return res
+    if res:
+        return "Failed to push the commit to origin"
 
 
 def find_existing_pr(owner, repo, head, base):
     api = "https://api.github.com/repos/{}/{}/pulls".format(owner, repo)
     res = github_api_get(api)
     if res.status_code < 300:
-        return [a for a in res.json()[:] if a["head"]["ref"] == head and a["base"]["ref"] == base][0]["html_url"]
+        matching_pr_list = [a for a in res.json()[:] if a["head"]["ref"] == head and a["base"]["ref"] == base]
+        if matching_pr_list:
+            return matching_pr_list[0]["html_url"]
 
 
 def create_pull_request(from_branch, to_branch, pr_title, pr_body):
@@ -369,7 +357,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         if pr_url and str(pr_url)[:4] == "http":
             launch_browser(pr_url)
             if pivotal_tracker_story_id:
-                if finish_and_post_message(pivotal_tracker_story_id, "PR: " + pr_url):
+                if finish_and_post_message_to_pivotal(pivotal_tracker_story_id, "PR: " + pr_url):
                     print "error with pivotal"
         return 0
     else:
@@ -378,8 +366,10 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
             print existing_pr_url
             launch_browser(existing_pr_url)
             return 0
-        print "Failed to create the PR"
-        return 1
+
+        for e in res.json()["errors"]:
+            print "Error:", e["message"]
+        return "Failed to create pull-request from " + from_branch + " to " + to_branch
 
 
 def github_api_post(api, data):
@@ -398,66 +388,43 @@ def github_api_get(api):
     return response
 
 
-def process_from_child(origin, new, is_add_all, file_paths, commit_message, pr_title, pr_body):
-    if create_branch(new):
-        return "Failed to create the new branch"
-
-    if add_changes(is_add_all, file_paths):
-        return "Failed to add files"
-
-    if commit(commit_message):
-        return "Failed to commit changes"
-
-    if push(new):
-        return "Failed to push the commit to origin"
-
-    if create_pull_request(new, origin, pr_title, pr_body):
-        return "Failed to create pull-request from " + new + " to " + origin
-
-    if stay_is_on:
-        checkout(origin)
-
-    return "Done"
+def verify_file_paths(file_paths):
+    # verify all the provided file paths are valid
+    if file_paths:
+        for p in file_paths:
+            if not os.path.exists(p):
+                print "Make sure %s exists" % p
+                return 1
 
 
-def process_to_parent(origin, parent, is_add_all, file_paths, commit_message, pr_title, pr_body):
-    if add_changes(is_add_all, file_paths):
-        return "Failed to add files"
-
-    if commit(commit_message):
-        return "Failed to commit changes"
-
-    if push(origin):
-        return "Failed to push the commit to origin"
-
-    if create_pull_request(origin, parent, pr_title, pr_body):
-        return "Failed to create pull-request from " + origin + " to " + parent
-
-    return "Done"
+def verify_parent_in_origin(origin):
+    if not os.path.exists(".git/refs/remotes/origin/%s" % origin):
+        print "Push the parent branch '%s' to origin before using PRH" % origin
+        return 1
 
 
-def process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_add_all, file_paths, commit_message,
-                                 pr_title,
-                                 pr_body):
-    if create_branch(branch_child):
-        return "Failed to create the new branch"
+def terminate_on_error(func, args):
+    error = func(args)
+    if error:
+        return error
 
-    if add_changes(is_add_all, file_paths):
-        return "Failed to add files"
 
-    if commit(commit_message):
-        return "Failed to commit changes"
+def process_from_child(origin, new, add_all, just_pr, file_paths, commit_message, pr_title, pr_body):
+    return create_branch(new) \
+           or (not just_pr and add_changes(add_all, file_paths)) \
+           or (not just_pr and commit(commit_message)) \
+           or push(new) \
+           or create_pull_request(new, origin, pr_title, pr_body) \
+           or (stay_is_on and checkout(origin)) \
+           or "Done"
 
-    if push(branch_child):
-        return "Failed to push the commit to origin"
 
-    if create_pull_request(branch_child, branch_parent, pr_title, pr_body):
-        return "Failed to create pull-request from " + branch_child + " to " + branch_parent
-
-    if stay_is_on:
-        checkout(branch_origin)
-
-    return "Done"
+def process_to_parent(origin, parent, add_all, just_pr, file_paths, commit_message, pr_title, pr_body):
+    return (not just_pr and add_changes(add_all, file_paths)) \
+           or (not just_pr and commit(commit_message)) \
+           or push(origin) \
+           or create_pull_request(origin, parent, pr_title, pr_body) \
+           or "Done"
 
 
 def revert_all(branch_origin, branch_child, branch_parent, is_add_all, file_paths):
@@ -706,6 +673,7 @@ def parse_arguments():
 
     if not args.branch and not args.upto and not args.sub_branch and not args.setup:
         parser.print_help()
+        return False
 
     return args
 
