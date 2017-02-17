@@ -267,14 +267,40 @@ def delete_branch(branch_name):
     return res
 
 
+def git_stash():
+    command = ["git", "stash"]
+    res = run_command(command)
+    return res
+
+
+def git_stash_apply():
+    command = ["git", "stash", "apply"]
+    res = run_command(command, 1)
+    return res
+
+
+def git_reset_head():
+    command = ["git", "reset", "HEAD"]
+    res = run_command(command)
+    return res
+
+
 def create_branch(branch_name):
     command = ["git", "checkout", "-q", "-b", branch_name]
     res = run_command(command, 0)
     if res == 128:
-        answer = raw_input(">>> Branch already exists, would you like me to delete it (y/n)? ")
+        answer = raw_input(">>> Branch '%s' already exists, would you like to check it out (y/n)?" % branch_name)
         if str.lower(answer) == 'y':
-            delete_branch(branch_name)
-            return create_branch(branch_name)
+            add_all()
+            git_stash()
+            checkout(branch_name)
+            error = git_stash_apply()
+            git_reset_head()
+            if error:
+                return "Error applying changes"
+
+            if ask_user(">>> Proceed with commiting and creating PR (y/n)?"):
+                return "Aborted"
         else:
             return "Failed to create the new branch"
     else:
@@ -374,7 +400,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
 
 def github_api_post(api, data):
     headers = {"Authorization": "token " + GITHUB_API_TOKEN}
-    response = requests.post(api, data=json.dumps(data), headers=headers)
+    response = Service(header=headers).post(api, data=json.dumps(data))
     log("--> %s" % api)
     log("<-- %s\n" % response.json())
     return response
@@ -382,7 +408,7 @@ def github_api_post(api, data):
 
 def github_api_get(api):
     headers = {"Authorization": "token " + GITHUB_API_TOKEN}
-    response = requests.post(api, headers=headers)
+    response = Service(header=headers).get(api)
     log("--> %s" % api)
     log("<-- %s\n" % response.json())
     return response
