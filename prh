@@ -5,8 +5,6 @@ import re
 import subprocess
 import sys
 
-import requests
-
 REPO_PATH = ""  # for debug purposes
 PRH_CONFIG_PATH = "config_file_path"
 
@@ -36,73 +34,86 @@ pivotal_tracker_api_endpoint = "https://www.pivotaltracker.com/services/v5"
 story = ""
 
 
+class Service:
+    import requests
+
+    def __init__(self, token=False, header={}):
+        self.token = token
+        if token:
+            self.header = {"X-TrackerToken": self.token}
+        else:
+            self.header = header
+
+    def get(self, api):
+        response = self.requests.get(api, headers=self.header)
+        log("--> %s" % api)
+        log("<-- %s\n" % response.json())
+        return response
+
+    def post(self, api, data):
+        response = self.requests.post(api, data=data, headers=self.header)
+        log("--> %s" % api)
+        log("<-- %s\n" % response.json())
+        return response
+
+    def put(self, api, data):
+        response = self.requests.put(api, data=data, headers=self.header)
+        log("--> %s" % api)
+        log("<-- %s\n" % response.json())
+        return response
+
+    @staticmethod
+    def log(message):
+        if verbose_is_on:
+            print message
+
+
 def log(message):
     if verbose_is_on:
         print message
 
 
-def get(api):
-    response = requests.get(api, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    log("--> %s" % api)
-    log("<-- %s\n" % response.json())
-    return response
-
-
-def post(api, data):
-    response = requests.post(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    log("--> %s" % api)
-    log("<-- %s\n" % response.json())
-    return response
-
-
-def put(api, data):
-    response = requests.put(api, data=data, headers={"X-TrackerToken": PIVOTAL_TRACKER_API_TOKEN})
-    log("--> %s" % api)
-    log("<-- %s\n" % response.json())
-    return response
-
-
-def get_story(story_id):
+def get_pivotal_story(story_id):
     global story
     if story:
         return story
 
     api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
-    resp = get(api)
+    resp = Service(PIVOTAL_TRACKER_API_TOKEN).get(api)
     story = resp.json()
     return story
 
 
-def mark_story_finished(project_id, story_id):
+def mark_pivotal_story_finished(project_id, story_id):
     api = "{}/projects/{}/stories/{}".format(pivotal_tracker_api_endpoint, project_id, story_id)
-    resp = put(api, {"current_state": "finished"})
+    resp = Service(PIVOTAL_TRACKER_API_TOKEN).put(api, {"current_state": "finished"})
     return resp.json()
 
 
-def post_comment(project_id, story_id, text):
+def post_pivotal_comment(project_id, story_id, text):
     api = "{}/projects/{}/stories/{}/comments".format(pivotal_tracker_api_endpoint, project_id, story_id)
-    resp = post(api, {"text": text})
+    resp = Service(PIVOTAL_TRACKER_API_TOKEN).post(api, {"text": text})
     return resp.json()
 
 
-def get_project_id(story_id):
+def get_pivotal_project_id(story_id):
     global story
     if story:
         return story["project_id"]
 
     api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
-    resp = get(api)
+    resp = Service(PIVOTAL_TRACKER_API_TOKEN).get(api)
     story = resp.json()
     return story["project_id"]
 
 
-def finish_and_post_message(story_id, message):
-    project_id = get_project_id(story_id)
+def finish_and_post_message_to_pivotal(story_id, message):
+    project_id = get_pivotal_project_id(story_id)
     if not PIVOTAL_TRACKER_API_TOKEN:
         return 1
-    if not mark_story_finished(project_id, story_id):
+    if not mark_pivotal_story_finished(project_id, story_id):
         return 1
-    if not post_comment(project_id, story_id, message):
+    if not post_pivotal_comment(project_id, story_id, message):
         return 1
     return 0
 

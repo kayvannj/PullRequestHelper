@@ -1,3 +1,4 @@
 .idea/
 prh_config.py
 *.pyc
+.prh
