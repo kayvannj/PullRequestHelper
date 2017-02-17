@@ -338,8 +338,11 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         pr_body = pr_body + "\n" + DEFAULT_PR_BODY
 
     if pivotal_tracker_story_url:
-        description = get_story(pivotal_tracker_story_id)["description"]
-        name = get_story(pivotal_tracker_story_id)["name"]
+        story = get_pivotal_story(pivotal_tracker_story_id)
+        if "description" in story:
+            description = story["description"]
+        if "name" in story:
+            name = story["name"]
         pr_body = pr_body + "\n\n**Story:** [" + name + "](" + pivotal_tracker_story_url + ")\n" + description
 
     setup_config_dic = read_from_setup_file()
