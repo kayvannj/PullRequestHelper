@@ -84,6 +84,36 @@ def get_pivotal_story(story_id):
     return story
 
 
+def get_pivotal_story_tasks(project_id, story_id):
+    """
+    [
+      {
+        "kind": "task",
+        "id": 52555419,
+        "story_id": 140104217,
+        "description": "with some tasks",
+        "complete": false,
+        "position": 1,
+        "created_at": "2017-02-16T23:52:05Z",
+        "updated_at": "2017-02-16T23:52:05Z"
+      },
+      {
+        "kind": "task",
+        "id": 52555421,
+        "story_id": 140104217,
+        "description": "task 2",
+        "complete": false,
+        "position": 2,
+        "created_at": "2017-02-16T23:52:09Z",
+        "updated_at": "2017-02-16T23:52:09Z"
+      }
+    ]
+    """
+    api = "{}/projects/{}/stories/{}/tasks".format(pivotal_tracker_api_endpoint, project_id, story_id)
+    resp = Service(PIVOTAL_TRACKER_API_TOKEN).get(api)
+    return resp.json()
+
+
 def mark_pivotal_story_finished(project_id, story_id):
     api = "{}/projects/{}/stories/{}".format(pivotal_tracker_api_endpoint, project_id, story_id)
     resp = Service(PIVOTAL_TRACKER_API_TOKEN).put(api, {"current_state": "finished"})
