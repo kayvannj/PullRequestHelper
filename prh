@@ -466,16 +466,15 @@ def revert_all(branch_origin, branch_child, branch_parent, is_add_all, file_path
 
 
 def main(args):
-    branch_child = ""
-    pr_title = ""
-    pr_body = ""
+    # there is a syntax error in arguments
+    if not args:
+        return False
+
     file_paths = []
+    branch_child = branch_parent = pr_title = pr_body = is_add_all = is_just_pr = commit_message = ""
+    need_to_confirm_empty = need_to_confirm_add_all = ""
     # get main branch name
-    branch_parent = ""
-    commit_message = ""
-    submodule = 0
     branch_origin = get_head()
-    is_add_all = False
 
     if args.setup:
         setup()
@@ -506,18 +505,21 @@ def main(args):
         pr_title = args.pr_title
 
     if args.add:
+        # -a exists
         for p in args.add:
-            if os.path.exists(p):
-                file_paths.append(p)
-            else:
-                break
+            file_paths.append(p)
+
+        # no path to add
+        if not file_paths:
+            need_to_confirm_empty = 1
     else:
-        is_add_all = True
+        # no -a
+        need_to_confirm_add_all = 1
 
     if args.empty:
-        global is_just_pr
         is_just_pr = True
         is_add_all = False
+        need_to_confirm_add_all = False
 
     if args.upto:
         branch_parent = args.upto
@@ -548,15 +550,40 @@ def main(args):
         global local_only_is_on
         local_only_is_on = 1
 
+    # Verification
+
+    error = verify_file_paths(file_paths)
+    if error:
+        return error
+
+    error = verify_parent_in_origin(branch_origin)
+    if error:
+        return error
+
+    if need_to_confirm_add_all:
+        list_of_changes = str(run_command(["git", "add", "-A", "-n"], 1)).strip()
+        if not list_of_changes:
+            # list of changes is empty
+            need_to_confirm_empty = True
+        else:
+            print("\n" + list_of_changes)
+            if ask_user(">>> Would you like to apply above changes (y/n)? "):
+                is_add_all = True
+            else:
+                return "Either add files using -a or add all the changes"
+
+    if need_to_confirm_empty:
+        if ask_user(">>> No file has been added, would you like to continue creating PR (y/n)? "):
+            is_just_pr = True
+        else:
+            return "Either add files using -a or add all the changes"
+
     if branch_child and not branch_parent:
-        print process_from_child(branch_origin, branch_child, is_add_all, file_paths, commit_message, pr_title, pr_body)
+        print process_from_child(branch_origin, branch_child, is_add_all, is_just_pr, file_paths, commit_message,
+                                 pr_title, pr_body)
     elif branch_parent and not branch_child:
-        print process_to_parent(branch_origin, branch_parent, is_add_all, file_paths, commit_message, pr_title, pr_body)
-    elif branch_child and branch_parent:
-        print process_from_child_to_parent(branch_origin, branch_child, branch_parent, is_add_all, file_paths,
-                                           commit_message,
-                                           pr_title,
-                                           pr_body)
+        print process_to_parent(branch_origin, branch_parent, is_add_all, is_just_pr, file_paths, commit_message,
+                                pr_title, pr_body)
     else:
         return
 
@@ -646,12 +673,10 @@ def read_from_setup_file():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="You can use prh in three main ways:<br>\n1) create a pr from a new branch to current branch\n"
+        description="You can use prh in two main ways:<br>\n1) create a pr from a new branch to current branch\n"
                     "prh -b <child_branch_name> [-a <file1_path> <file2_path> ...]\n"
                     "2) create a pr from current branch to a different branch\n"
-                    "prh -upto <parent_branch_name>\n"
-                    "3) create a pr from a new branch to a different branch\n"
-                    "prh -b <child_branch_name> -upto <parent_branch_name>", version=APP_VERSION)
+                    "prh -upto <parent_branch_name>\n", version=APP_VERSION)
     parser.add_argument("--verbose", help="run in verbose mode", const=True, nargs='?')
     parser.add_argument("-d", "--debug", help="run in debug mode", const=True, nargs='?')
     parser.add_argument("-s", "--stay_on", help="come back to current branch after all is done", const=True, nargs='?')
