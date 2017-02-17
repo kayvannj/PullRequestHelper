@@ -622,18 +622,17 @@ def run_popen(command):
 
 def get_owner(git_url):
     """
-        >>> get_owner("git@github.com:doximity/Android.git")
-        doximity
+    >>> get_owner("git@github.com:doximity/Android.git")
+    'doximity'
     """
     return git_url.split(":")[-1].split("/")[0]
 
 
 def get_repo(git_url):
     """
-        >>> get_repo("git@github.com:doximity/Android.git")
-        Android
+    >>> get_repo("git@github.com:doximity/Android.git")
+    'Android'
     """
-
     return git_url.split(":")[-1].split("/")[1].split(".")[0]
 
 
