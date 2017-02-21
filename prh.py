@@ -4,18 +4,25 @@ import os
 import re
 import subprocess
 import sys
+import argparse
+
+SLACK_INTEGRATION_URL_KEY = "SLACK_INTEGRATION_URL"
+DEFAULT_PULL_REQUEST_BODY_KEY = "DEFAULT_PULL_REQUEST_BODY"
+DEFAULT_COMMIT_MESSAGE_KEY = "DEFAULT_COMMIT_MESSAGE"
+PIVOTAL_API_TOKEN_KEY = "PIVOTAL_TRACKER_API_TOKEN"
+GITHUB_API_TOKEN_KEY = "GITHUB_API_TOKEN"
+EMPTY_CONFIG_CONTENT_DIC = {GITHUB_API_TOKEN_KEY: "", PIVOTAL_API_TOKEN_KEY: "",
+                            DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
+                            SLACK_INTEGRATION_URL_KEY: ""}
 
 REPO_PATH = ""  # for debug purposes
-# PRH_CONFIG_PATH = "/usr/local/etc"
-PRH_CONFIG_PATH = "config_file_path"
-sys.path.append(os.path.abspath(PRH_CONFIG_PATH))
-import prh_config
-import argparse
+PRH_CONFIG_PATH = "/usr/local/etc"
+# PRH_CONFIG_PATH = "config_file_path"
 
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = "/.git"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.1.1"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -205,24 +212,29 @@ def add_all():
     return run_command(command, 1)
 
 
-def get_head():
+def get_head(current_path=""):
     # read the head from git dir
-    with open(get_repo_git_dir() + "/HEAD") as f:
+    with open(get_repo_git_dir(current_path) + "/HEAD") as f:
         ref = f.read()
         return ref.split("/")[-1].strip()
 
 
-def get_repo_git_dir():
-    git_config_dir_path = repo_path + GIT_FILE_PATH
-    if os.path.isfile(git_config_dir_path):
-        with open(git_config_dir_path) as f:
+def get_repo_git_dir(current_path=""):
+    """
+    >>> get_repo_git_dir("/Users/kayvan/Documents/sources/Dox Source/dxCore")
+    '../.git/modules/dxCore'
+    >>> get_repo_git_dir("/Users/kayvan/Documents/sources/Dox Source")
+    '/Users/kayvan/Documents/sources/Dox Source/.git'
+    """
+    git_dir_path = current_path + GIT_FILE_PATH
+    # in the case of being in a submodule folder
+    if os.path.isfile(git_dir_path):
+        with open(git_dir_path) as f:
             line = f.readline()
             # gitdir: ../.git/modules/dxCore
             git_dir_path = line.split(":")[1].strip()
-            git_config_dir_path = repo_path + "/" + git_dir_path
-            log(git_config_dir_path)
-
-    return git_config_dir_path
+    log("git dir path = " + git_dir_path)
+    return git_dir_path
 
 
 def get_submodule_name():
@@ -424,7 +436,7 @@ def verify_file_paths(file_paths):
 
 
 def verify_parent_in_origin(origin):
-    if not os.path.exists(".git/refs/remotes/origin/%s" % origin):
+    if not os.path.exists(get_repo_git_dir() + "/refs/remotes/origin/%s" % origin):
         print "Push the parent branch '%s' to origin before using PRH" % origin
         return 1
 
@@ -468,10 +480,16 @@ def main(args):
     need_to_confirm_empty = need_to_confirm_add_all = ""
     # get main branch name
     branch_origin = get_head()
+    working_path = ""
 
     if args.setup:
         setup()
         return
+
+    if args.path:
+        working_path = args.path
+        if working_path[-1] != "/":
+            working_path += "/"
 
     if args.debug:
         global debug_is_on
@@ -500,7 +518,7 @@ def main(args):
     if args.add:
         # -a exists
         for p in args.add:
-            file_paths.append(p)
+            file_paths.append(working_path + p)
 
         # no path to add
         if not file_paths:
@@ -690,6 +708,7 @@ def parse_arguments():
                         help="Do not push any changes or create a PR, only create the branch and make the commit",
                         const=True, nargs='?')
     parser.add_argument("setup", help="Setup the pull-request helper", const=True, nargs='?')
+    parser.add_argument("-p", "--path")
 
     args = parser.parse_args()
 
@@ -700,22 +719,61 @@ def parse_arguments():
     return args
 
 
-def write_to_config_file(dic):
+def write_to_config_file(dic, to_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".json"):
     """
     write to the user scoped config file for PRH
-    :param dic:
     :return:
     """
-    with open(PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py", mode='w') as f:
-        for key in dic:
-            f.write(key + "=\"" + dic[key] + "\"\n")
+    with open(to_path, mode='w') as f:
+        f.write("{")
+        for i in range(len(dic) - 1):
+            f.write('"%s":"%s",' % (dic.keys()[i], dic.values()[i]))
+        f.write('"%s":"%s"' % (dic.keys()[-1], dic.values()[-1]))
+        f.write("}")
+
+
+def read_from_config_file(file_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".json"):
+    """
+    read from the user scoped config file for PRH
+    """
+    config_path = file_path
+    if os.path.isfile(config_path):
+        with open(config_path, mode='r') as f:
+            return json.load(f)
+    else:
+        write_to_config_file({
+            GITHUB_API_TOKEN_KEY: "",
+            PIVOTAL_API_TOKEN_KEY: "",
+            DEFAULT_COMMIT_MESSAGE_KEY: "Commit",
+            DEFAULT_PULL_REQUEST_BODY_KEY: "",
+            SLACK_INTEGRATION_URL_KEY: ""
+        })
+        return read_from_config_file()
+
+
+def migrate_config_file(from_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py",
+                        to_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".json"):
+    old_config_path = from_path
+    old_dic = {}
+    if os.path.isfile(old_config_path):
+        with open(old_config_path, "r") as conf:
+            for line in conf.readlines():
+                key, value = line.split("=")
+                old_dic[key.strip()] = value.strip('"  \n')
+        write_to_config_file(old_dic, to_path)
+        os.remove(old_config_path)
 
 
 if __name__ == "__main__":
-    DEFAULT_COMMIT_MESSAGE = prh_config.DEFAULT_COMMIT_MESSAGE
-    DEFAULT_PR_BODY = prh_config.DEFAULT_PULL_REQUEST_BODY
-    PIVOTAL_TRACKER_API_TOKEN = prh_config.PIVOTAL_TRACKER_API_TOKEN
-    GITHUB_API_TOKEN = prh_config.GITHUB_API_TOKEN
+    import doctest
+
+    doctest.testmod()
+    migrate_config_file()
+    prh_config = read_from_config_file()
+    GITHUB_API_TOKEN = prh_config[GITHUB_API_TOKEN_KEY]
+    PIVOTAL_TRACKER_API_TOKEN = prh_config[PIVOTAL_API_TOKEN_KEY]
+    DEFAULT_COMMIT_MESSAGE = prh_config[DEFAULT_COMMIT_MESSAGE_KEY]
+    DEFAULT_PR_BODY = prh_config[DEFAULT_PULL_REQUEST_BODY_KEY]
 
     if REPO_PATH:
         repo_path = REPO_PATH
@@ -729,19 +787,18 @@ if __name__ == "__main__":
 
     config_changed = 0
     if not GITHUB_API_TOKEN:
-        config_changed = 1
         GITHUB_API_TOKEN = raw_input("Please enter your Github API token: ")
+        if GITHUB_API_TOKEN:
+            config_changed = 1
+
     if not PIVOTAL_TRACKER_API_TOKEN:
-        config_changed = 1
         PIVOTAL_TRACKER_API_TOKEN = raw_input("Please enter your PivotalTracker API token: ")
+        if PIVOTAL_TRACKER_API_TOKEN:
+            config_changed = 1
 
     if config_changed:
-        write_to_config_file({
-            "GITHUB_API_TOKEN": GITHUB_API_TOKEN,
-            "PIVOTAL_TRACKER_API_TOKEN": PIVOTAL_TRACKER_API_TOKEN,
-            "DEFAULT_COMMIT_MESSAGE": "Commit",
-            "DEFAULT_PULL_REQUEST_BODY": "",
-            "SLACK_INTEGRATION_URL": ""
-        })
+        write_to_config_file({GITHUB_API_TOKEN_KEY: GITHUB_API_TOKEN, PIVOTAL_API_TOKEN_KEY: PIVOTAL_API_TOKEN_KEY,
+                              DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
+                              SLACK_INTEGRATION_URL_KEY: ""})
 
     sys.exit(main(parse_arguments()))
