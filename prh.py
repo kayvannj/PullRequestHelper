@@ -21,7 +21,7 @@ PRH_CONFIG_PATH = "/usr/local/etc"
 
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
-GIT_FILE_PATH = "/.git"
+GIT_FILE_PATH = ".git"
 APP_VERSION = "2.1.1"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
@@ -226,6 +226,8 @@ def get_repo_git_dir(current_path=""):
     >>> get_repo_git_dir("/Users/kayvan/Documents/sources/Dox Source")
     '/Users/kayvan/Documents/sources/Dox Source/.git'
     """
+    if not current_path.endswith("/"):
+        current_path += "/"
     git_dir_path = current_path + GIT_FILE_PATH
     # in the case of being in a submodule folder
     if os.path.isfile(git_dir_path):
@@ -794,7 +796,7 @@ if __name__ == "__main__":
             config_changed = 1
 
     if config_changed:
-        write_to_config_file({GITHUB_API_TOKEN_KEY: GITHUB_API_TOKEN, PIVOTAL_API_TOKEN_KEY: PIVOTAL_API_TOKEN_KEY,
+        write_to_config_file({GITHUB_API_TOKEN_KEY: GITHUB_API_TOKEN, PIVOTAL_API_TOKEN_KEY: PIVOTAL_TRACKER_API_TOKEN,
                               DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
                               SLACK_INTEGRATION_URL_KEY: ""})
 
