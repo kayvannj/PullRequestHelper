@@ -765,9 +765,6 @@ def migrate_config_file(from_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py"
 
 
 if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()
     migrate_config_file()
     prh_config = read_from_config_file()
     GITHUB_API_TOKEN = prh_config[GITHUB_API_TOKEN_KEY]
