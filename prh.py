@@ -226,7 +226,7 @@ def get_repo_git_dir(current_path=""):
     >>> get_repo_git_dir("/Users/kayvan/Documents/sources/Dox Source")
     '/Users/kayvan/Documents/sources/Dox Source/.git'
     """
-    if not current_path.endswith("/"):
+    if current_path and not current_path.endswith("/"):
         current_path += "/"
     git_dir_path = current_path + GIT_FILE_PATH
     # in the case of being in a submodule folder
