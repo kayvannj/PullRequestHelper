@@ -22,12 +22,13 @@ PRH_CONFIG_PATH = "/usr/local/etc"
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.1.2"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
-PIVOTAL_TRACKER_API_TOKEN = ""  # prh_config.PIVOTAL_TRACKER_API_TOKEN
-GITHUB_API_TOKEN = ""
+# PIVOTAL_TRACKER_API_TOKEN = ""  # prh_config.PIVOTAL_TRACKER_API_TOKEN
+# GITHUB_API_TOKEN = ""
+NO_ERROR = 0
 pivotal_tracker_story_id = ""
 pivotal_tracker_story_url = ""
 debug_is_on = 0
@@ -85,7 +86,7 @@ def get_pivotal_story(story_id):
         return story
 
     api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
-    resp = Service(PIVOTAL_TRACKER_API_TOKEN).get(api)
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
     story = resp.json()
     return story
 
@@ -116,19 +117,19 @@ def get_pivotal_story_tasks(project_id, story_id):
     ]
     """
     api = "{}/projects/{}/stories/{}/tasks".format(pivotal_tracker_api_endpoint, project_id, story_id)
-    resp = Service(PIVOTAL_TRACKER_API_TOKEN).get(api)
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
     return resp.json()
 
 
 def mark_pivotal_story_finished(project_id, story_id):
     api = "{}/projects/{}/stories/{}".format(pivotal_tracker_api_endpoint, project_id, story_id)
-    resp = Service(PIVOTAL_TRACKER_API_TOKEN).put(api, {"current_state": "finished"})
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).put(api, {"current_state": "finished"})
     return resp.json()
 
 
 def post_pivotal_comment(project_id, story_id, text):
     api = "{}/projects/{}/stories/{}/comments".format(pivotal_tracker_api_endpoint, project_id, story_id)
-    resp = Service(PIVOTAL_TRACKER_API_TOKEN).post(api, {"text": text})
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).post(api, {"text": text})
     return resp.json()
 
 
@@ -138,20 +139,20 @@ def get_pivotal_project_id(story_id):
         return story["project_id"]
 
     api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
-    resp = Service(PIVOTAL_TRACKER_API_TOKEN).get(api)
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
     story = resp.json()
     return story["project_id"]
 
 
 def finish_and_post_message_to_pivotal(story_id, message):
     project_id = get_pivotal_project_id(story_id)
-    if not PIVOTAL_TRACKER_API_TOKEN:
+    if not read_from_config_file()[PIVOTAL_API_TOKEN_KEY]:
         return 1
     if not mark_pivotal_story_finished(project_id, story_id):
         return 1
     if not post_pivotal_comment(project_id, story_id, message):
         return 1
-    return 0
+    return NO_ERROR
 
 
 def run_command_str(command, output=0):
@@ -177,7 +178,7 @@ def run_command(command, output=0):
     """
     if debug_is_on:
         print_command(command)
-        return 0
+        return NO_ERROR
     else:
         if verbose_is_on:
             print command
@@ -337,7 +338,7 @@ def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
 
 def push(branch_name):
     if local_only_is_on:
-        return 0
+        return NO_ERROR
 
     command = ["git", "push", "--set-upstream", "origin", branch_name]
     res = run_command(command)
@@ -356,7 +357,7 @@ def find_existing_pr(owner, repo, head, base):
 
 def create_pull_request(from_branch, to_branch, pr_title, pr_body):
     if local_only_is_on:
-        return 0
+        return NO_ERROR
 
     if not pr_title:
         pr_title = get_head().replace("_", " ")
@@ -396,16 +397,22 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         print "PR created: {}".format(pr_url)
         if pr_url and str(pr_url)[:4] == "http":
             launch_browser(pr_url)
+
             if pivotal_tracker_story_id:
-                if finish_and_post_message_to_pivotal(pivotal_tracker_story_id, "PR: " + pr_url):
+                project_id = get_pivotal_project_id(pivotal_tracker_story_id)
+                if post_pivotal_comment(project_id, pivotal_tracker_story_id, "PR: " + pr_url):
                     print "error with pivotal"
-        return 0
+
+                if ask_user("Mark story as finished?(y/n)"):
+                    if mark_pivotal_story_finished(project_id, pivotal_tracker_story_id):
+                        print "error with pivotal"
+        return NO_ERROR
     else:
         existing_pr_url = find_existing_pr(owner, repo, from_branch, to_branch)
         if existing_pr_url:
             print existing_pr_url
             launch_browser(existing_pr_url)
-            return 0
+            return NO_ERROR
 
         for e in res.json()["errors"]:
             print "Error:", e["message"]
@@ -413,7 +420,7 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
 
 
 def github_api_post(api, data):
-    headers = {"Authorization": "token " + GITHUB_API_TOKEN}
+    headers = {"Authorization": "token " + read_from_config_file()[GITHUB_API_TOKEN_KEY]}
     response = Service(header=headers).post(api, data=json.dumps(data))
     log("--> %s" % api)
     log("<-- %s\n" % response.json())
@@ -421,7 +428,7 @@ def github_api_post(api, data):
 
 
 def github_api_get(api):
-    headers = {"Authorization": "token " + GITHUB_API_TOKEN}
+    headers = {"Authorization": "token " + read_from_config_file()[GITHUB_API_TOKEN_KEY]}
     response = Service(header=headers).get(api)
     log("--> %s" % api)
     log("<-- %s\n" % response.json())
@@ -601,13 +608,39 @@ def main(args):
         return
 
 
-def setup():
-    setup_config = read_from_setup_file()
-    if setup_config:
-        return 0
+def missing_global_config():
+    prh_config = read_from_config_file()
+    return not prh_config[GITHUB_API_TOKEN_KEY]
 
+
+def missing_local_config():
+    setup_config = read_from_setup_file()
+    return not setup_config
+
+
+def setup():
     print "Running setup"
-    remotes = []
+
+    prh_config = read_from_config_file()
+    github_token = prh_config[GITHUB_API_TOKEN_KEY]
+    pivotal_token = prh_config[PIVOTAL_API_TOKEN_KEY]
+    # global setup
+    config_changed = 0
+    if not github_token:
+        github_token = raw_input("Please enter your Github API token: ")
+        if github_token:
+            config_changed = 1
+
+    if not pivotal_token:
+        pivotal_token = raw_input("Please enter your PivotalTracker API token: ")
+        if pivotal_token:
+            config_changed = 1
+
+    if config_changed:
+        write_to_config_file({GITHUB_API_TOKEN_KEY: github_token, PIVOTAL_API_TOKEN_KEY: pivotal_token,
+                              DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
+                              SLACK_INTEGRATION_URL_KEY: ""})
+    # local setup
 
     git_dir = get_repo_git_dir()
     if os.path.isdir(git_dir):
@@ -768,11 +801,6 @@ def migrate_config_file(from_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py"
 
 if __name__ == "__main__":
     migrate_config_file()
-    prh_config = read_from_config_file()
-    GITHUB_API_TOKEN = prh_config[GITHUB_API_TOKEN_KEY]
-    PIVOTAL_TRACKER_API_TOKEN = prh_config[PIVOTAL_API_TOKEN_KEY]
-    DEFAULT_COMMIT_MESSAGE = prh_config[DEFAULT_COMMIT_MESSAGE_KEY]
-    DEFAULT_PR_BODY = prh_config[DEFAULT_PULL_REQUEST_BODY_KEY]
 
     if REPO_PATH:
         repo_path = REPO_PATH
@@ -780,24 +808,7 @@ if __name__ == "__main__":
         # get current working dir
         repo_path = os.getcwd()
 
-    setup_config = read_from_setup_file()
-    if not setup_config:
+    if missing_global_config() or missing_local_config():
         setup()
-
-    config_changed = 0
-    if not GITHUB_API_TOKEN:
-        GITHUB_API_TOKEN = raw_input("Please enter your Github API token: ")
-        if GITHUB_API_TOKEN:
-            config_changed = 1
-
-    if not PIVOTAL_TRACKER_API_TOKEN:
-        PIVOTAL_TRACKER_API_TOKEN = raw_input("Please enter your PivotalTracker API token: ")
-        if PIVOTAL_TRACKER_API_TOKEN:
-            config_changed = 1
-
-    if config_changed:
-        write_to_config_file({GITHUB_API_TOKEN_KEY: GITHUB_API_TOKEN, PIVOTAL_API_TOKEN_KEY: PIVOTAL_TRACKER_API_TOKEN,
-                              DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
-                              SLACK_INTEGRATION_URL_KEY: ""})
 
     sys.exit(main(parse_arguments()))
