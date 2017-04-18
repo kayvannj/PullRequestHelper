@@ -457,6 +457,7 @@ def terminate_on_error(func, args):
 
 def parse_commit_message(raw_commit_message):
     # re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
+    commit_message = raw_commit_message
     re_res = re.findall("http[s]?:\/\/.*pivotaltracker.*\/(\d*)", commit_message)
     # "https://www.pivotaltracker.com/story/show/140176051 https://www.pivotaltracker.com/story/show/139604723"
     full_urls = story_ids = []
