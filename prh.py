@@ -455,6 +455,26 @@ def terminate_on_error(func, args):
     if error:
         return error
 
+def parse_commit_message(raw_commit_message):
+    # re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
+    re_res = re.findall("http[s]?:\/\/.*pivotaltracker.*\/(\d*)", commit_message)
+    # "https://www.pivotaltracker.com/story/show/140176051 https://www.pivotaltracker.com/story/show/139604723"
+    full_urls = story_ids = []
+    if re_res:
+        for url in re_res:
+            full_urls += url[0]
+            story_ids += url[1]
+            commit_message = commit_message.replace(url[0], "")
+    return commit_message, full_urls, story_ids
+    # if re_search:
+    #     full_url = re_search.group(0)
+    #     story_id = re_search.group(1)
+    #     global pivotal_tracker_story_id
+    #     pivotal_tracker_story_id = story_id
+    #     global pivotal_tracker_story_url
+    #     pivotal_tracker_story_url = full_url
+    #     commit_message = commit_message.replace(full_url, "")
+
 
 def process_from_child(origin, new, add_all, just_pr, file_paths, commit_message, pr_title, pr_body):
     return create_branch(new) \
@@ -554,17 +574,7 @@ def main(args):
                 main(submodule_args)
 
     if args.message:
-        commit_message = args.message
-        re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
-
-        if re_search:
-            full_url = re_search.group(0)
-            story_id = re_search.group(1)
-            global pivotal_tracker_story_id
-            pivotal_tracker_story_id = story_id
-            global pivotal_tracker_story_url
-            pivotal_tracker_story_url = full_url
-            commit_message = commit_message.replace(full_url, "")
+        commit_message,full_urls,story_ids = parse_commit_message(args.message)
 
     if args.local:
         global local_only_is_on
@@ -653,7 +663,7 @@ def setup():
         return
 
     if not remotes:
-        print "Could not find origin url in the .git/config file"
+        print "Could not find origin url in the .git/config file.\nYour origin URL should be in form of git.*\.git"
         return
 
     write_to_setup_file(remotes)

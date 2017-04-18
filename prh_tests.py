@@ -15,3 +15,10 @@ class PrhTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(new_config_path), "new config doesn't exists after migration")
         config_file = prh.read_from_config_file(file_path=new_config_path)
         self.assertEqual(config_file["test1_param1"], 'test1 Value1', "the values didn't carry over to new config")
+
+    def test_pr_template_append(self):
+        pass
+
+    def test_multiple_link_in_commit_message(self):
+        parse_commit_message("https://www.pivotaltracker.com/story/show/140176051 https://www.pivotaltracker.com/story/show/139604723")
+        
