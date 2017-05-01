@@ -22,15 +22,13 @@ PRH_CONFIG_PATH = "/usr/local/etc"
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.1.2"
+APP_VERSION = "2.2.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
 # PIVOTAL_TRACKER_API_TOKEN = ""  # prh_config.PIVOTAL_TRACKER_API_TOKEN
 # GITHUB_API_TOKEN = ""
 NO_ERROR = 0
-pivotal_tracker_story_id = ""
-pivotal_tracker_story_url = ""
 debug_is_on = 0
 verbose_is_on = 0
 local_only_is_on = 0
@@ -322,15 +320,16 @@ def create_branch(branch_name):
         return res
 
 
-def commit(commit_message=DEFAULT_COMMIT_MESSAGE):
-    if not commit_message:
-        if pivotal_tracker_story_id:
-            story_json = get_pivotal_story(pivotal_tracker_story_id)
-            commit_message = story_json["name"]
-        else:
-            commit_message = DEFAULT_COMMIT_MESSAGE
+def commit(user_input):
+    if not user_input.commit_message:
+        for story_id in user_input.tracker_ids:
+            if story_id:
+                story_json = get_pivotal_story(story_id)
+                user_input.commit_message = story_json["name"]
+            else:
+                user_input = DEFAULT_COMMIT_MESSAGE
 
-    command = ["git", "commit", "-m", commit_message]
+    command = ["git", "commit", "-m", user_input]
     res = run_command(command)
     if res:
         return "Failed to commit changes"
@@ -355,24 +354,26 @@ def find_existing_pr(owner, repo, head, base):
             return matching_pr_list[0]["html_url"]
 
 
-def create_pull_request(from_branch, to_branch, pr_title, pr_body):
+def create_pull_request(from_branch, to_branch, user_input):
     if local_only_is_on:
         return NO_ERROR
 
-    if not pr_title:
+    if not user_input.pr_title:
         pr_title = get_head().replace("_", " ")
-    if not pr_body:
+    if not user_input.pr_body:
         pr_body = DEFAULT_PR_BODY
     else:
-        pr_body = pr_body + "\n" + DEFAULT_PR_BODY
+        pr_body = user_input.pr_body + "\n" + DEFAULT_PR_BODY
 
-    if pivotal_tracker_story_url:
-        story = get_pivotal_story(pivotal_tracker_story_id)
+    # Add description of stories to the pr_body
+    for i in range(len(user_input.tracker_urls)):
+        story = get_pivotal_story(user_input.tracker_ids[i])
+        description = name = ""
         if "description" in story:
             description = story["description"]
         if "name" in story:
             name = story["name"]
-        pr_body = pr_body + "\n\n**Story:** [" + name + "](" + pivotal_tracker_story_url + ")\n" + description
+        pr_body = pr_body + "\n\n**Story:** [" + name + "](" + user_input.tracker_urls[i] + ")\n" + description
 
     setup_config_dic = read_from_setup_file()
     owner = setup_config_dic["owner"]
@@ -398,14 +399,15 @@ def create_pull_request(from_branch, to_branch, pr_title, pr_body):
         if pr_url and str(pr_url)[:4] == "http":
             launch_browser(pr_url)
 
-            if pivotal_tracker_story_id:
-                project_id = get_pivotal_project_id(pivotal_tracker_story_id)
-                if post_pivotal_comment(project_id, pivotal_tracker_story_id, "PR: " + pr_url):
-                    print "error with pivotal"
+            for i in range(len(user_input.tracker_ids)):
+                if user_input.tracker_ids[i]:
+                    project_id = get_pivotal_project_id(user_input.tracker_ids[i])
+                    if post_pivotal_comment(project_id, user_input.tracker_ids[i], "PR: " + pr_url):
+                        print "error with pivotal, commenting pr link"
 
-                if ask_user("Mark story as finished?(y/n)"):
-                    if mark_pivotal_story_finished(project_id, pivotal_tracker_story_id):
-                        print "error with pivotal"
+                    if ask_user("Mark story with id="+user_input.tracker_ids[i]+" as finished?(y/n)"):
+                        if mark_pivotal_story_finished(project_id, user_input.tracker_ids[i]):
+                            print "error with pivotal, marking story as finished"
         return NO_ERROR
     else:
         existing_pr_url = find_existing_pr(owner, repo, from_branch, to_branch)
@@ -477,21 +479,39 @@ def parse_commit_message(raw_commit_message):
     #     commit_message = commit_message.replace(full_url, "")
 
 
-def process_from_child(origin, new, add_all, just_pr, file_paths, commit_message, pr_title, pr_body):
+def parse_commit_message(commit_message, full_urls, story_ids):
+    """
+    Parse the user entered commit message and extract any known urls from it
+    :param commit_message:
+    :param full_urls:
+    :param story_ids:
+    :return: (commit_message, full_urls, story_ids)
+    """
+    re_search = re.search("http[s]?:\/\/\S*pivotaltracker.com\S*\/(\d*)", commit_message)
+    if re_search:
+        full_urls += [re_search.group(0)]
+        story_ids += [re_search.group(1)]
+        commit_message = commit_message.replace(re_search.group(0), "")
+    else:
+        return commit_message, full_urls, story_ids
+    return parse_commit_message(commit_message, full_urls, story_ids)
+
+
+def process_from_child(origin, new, add_all, just_pr, file_paths, user_input):
     return create_branch(new) \
            or (not just_pr and add_changes(add_all, file_paths)) \
-           or (not just_pr and commit(commit_message)) \
+           or (not just_pr and commit(user_input)) \
            or push(new) \
-           or create_pull_request(new, origin, pr_title, pr_body) \
+           or create_pull_request(new, origin, user_input) \
            or (stay_is_on and checkout(origin)) \
            or "Done"
 
 
-def process_to_parent(origin, parent, add_all, just_pr, file_paths, commit_message, pr_title, pr_body):
+def process_to_parent(origin, parent, add_all, just_pr, file_paths, user_input):
     return (not just_pr and add_changes(add_all, file_paths)) \
-           or (not just_pr and commit(commit_message)) \
+           or (not just_pr and commit(user_input)) \
            or push(origin) \
-           or create_pull_request(origin, parent, pr_title, pr_body) \
+           or create_pull_request(origin, parent, user_input) \
            or "Done"
 
 
@@ -500,17 +520,26 @@ def revert_all(branch_origin, branch_child, branch_parent, is_add_all, file_path
         return "Failed to check out original branch"
 
 
+class UserInput:
+    def __init__(self, commit_message="", tracker_urls=[], tracker_ids=[], pr_title="", pr_body=""):
+        self.pr_title = pr_title
+        self.pr_body = pr_body
+        self.tracker_ids = tracker_ids
+        self.tracker_urls = tracker_urls
+        self.commit_message = commit_message
+
+
 def main(args):
     # there is a syntax error in arguments
     if not args:
         return False
-
     file_paths = []
     branch_child = branch_parent = pr_title = pr_body = is_add_all = is_just_pr = commit_message = ""
     need_to_confirm_empty = need_to_confirm_add_all = ""
     # get main branch name
     branch_origin = get_head()
     working_path = ""
+    user_input = UserInput()
 
     if args.setup:
         setup()
@@ -540,10 +569,10 @@ def main(args):
         branch_child = branch_origin + "_" + args.sub_branch
 
     if args.pr_body:
-        pr_body = args.pr_body
+        user_input.pr_body = args.pr_body
 
     if args.pr_title:
-        pr_title = args.pr_title
+        user_input.pr_title = args.pr_title
 
     if args.add:
         # -a exists
@@ -575,7 +604,10 @@ def main(args):
                 main(submodule_args)
 
     if args.message:
-        commit_message,full_urls,story_ids = parse_commit_message(args.message)
+        commit_message, full_urls, story_ids = parse_commit_message(args.message, [], [])
+        user_input.tracker_urls = full_urls
+        user_input.tracker_ids = story_ids
+        user_input.commit_message = commit_message
 
     if args.local:
         global local_only_is_on
@@ -610,11 +642,9 @@ def main(args):
             return "Either add files using -a or add all the changes"
 
     if branch_child and not branch_parent:
-        print process_from_child(branch_origin, branch_child, is_add_all, is_just_pr, file_paths, commit_message,
-                                 pr_title, pr_body)
+        print process_from_child(branch_origin, branch_child, is_add_all, is_just_pr, file_paths, user_input)
     elif branch_parent and not branch_child:
-        print process_to_parent(branch_origin, branch_parent, is_add_all, is_just_pr, file_paths, commit_message,
-                                pr_title, pr_body)
+        print process_to_parent(branch_origin, branch_parent, is_add_all, is_just_pr, file_paths, user_input)
     else:
         return
 

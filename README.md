@@ -16,6 +16,7 @@ your project id and api token and then all you need to do is to post a link to
 your story in the ```-m``` option along side of your commit message and prh will mark the 
 story finished and link PR to the story.  
 <br>
+
 ## Install
 Now you can install prh simply by using
 
@@ -27,17 +28,19 @@ and you are good to go 🎉
 
 In the first run, `prh` is going to setup some configurations. The setup is also accessable from `prh setup` command
 
-####Where to find PivotalTracker API token from? https://www.pivotaltracker.com/help/articles/api_token/
-####What permissions are needed for GitHub Api token? 
-![permissions](\permissions.png)
+#### Where to find PivotalTracker API token from? 
+https://www.pivotaltracker.com/help/articles/api_token/
+#### What permissions are needed for GitHub Api token? 
+Only repo permissions
 
-#Usage
+# Usage
+```
 usage: prh [-h] [-v] [--verbose [VERBOSE]] [-d [DEBUG]] [-s [STAY_ON]]
            [-b [BRANCH]] [-sb [SUB_BRANCH]] [-pb [PR_BODY]] [-pt [PR_TITLE]]
            [-a [ADD [ADD ...]]] [-e [EMPTY]] [-upto [UPTO]] [-sub [SUB]]
            [-m [MESSAGE]] [-l [LOCAL]]
            [setup]
-
+           
 positional arguments:
   setup                 Setup the pull-request helper
 
@@ -72,3 +75,4 @@ optional arguments:
   -l [LOCAL], --local [LOCAL]
                         Do not push any changes or create a PR, only create
                         the branch and make the commit
+```

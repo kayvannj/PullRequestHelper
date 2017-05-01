@@ -1,5 +1,6 @@
 import os
 import unittest
+
 import prh
 
 
@@ -20,5 +21,10 @@ class PrhTests(unittest.TestCase):
         pass
 
     def test_multiple_link_in_commit_message(self):
-        parse_commit_message("https://www.pivotaltracker.com/story/show/140176051 https://www.pivotaltracker.com/story/show/139604723")
-        
+        cm, full_url, story_ids = prh.parse_commit_message(
+            "this ishttps://www.pivotaltracker.com/story/show/140176051 https://www.pivotaltracker.com/story/show/139604723a test",
+            [], [])
+        self.assertEqual(cm, "this is a test")
+        self.assertEqual(full_url, ["https://www.pivotaltracker.com/story/show/140176051",
+                                    "https://www.pivotaltracker.com/story/show/139604723"])
+        self.assertEqual(story_ids, ["140176051", "139604723"])
