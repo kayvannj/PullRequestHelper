@@ -1,10 +1,11 @@
 #!/usr/bin/env python
+import argparse
 import json
 import os
 import re
 import subprocess
 import sys
-import argparse
+
 
 SLACK_INTEGRATION_URL_KEY = "SLACK_INTEGRATION_URL"
 DEFAULT_PULL_REQUEST_BODY_KEY = "DEFAULT_PULL_REQUEST_BODY"
@@ -16,8 +17,8 @@ EMPTY_CONFIG_CONTENT_DIC = {GITHUB_API_TOKEN_KEY: "", PIVOTAL_API_TOKEN_KEY: "",
                             SLACK_INTEGRATION_URL_KEY: ""}
 
 REPO_PATH = ""  # for debug purposes
-PRH_CONFIG_PATH = "/usr/local/etc"
-# PRH_CONFIG_PATH = "config_file_path"
+# PRH_CONFIG_PATH = "/usr/local/etc"
+PRH_CONFIG_PATH = "config_file_path"
 
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
@@ -26,8 +27,6 @@ APP_VERSION = "2.2.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
-# PIVOTAL_TRACKER_API_TOKEN = ""  # prh_config.PIVOTAL_TRACKER_API_TOKEN
-# GITHUB_API_TOKEN = ""
 NO_ERROR = 0
 debug_is_on = 0
 verbose_is_on = 0
@@ -320,6 +319,11 @@ def create_branch(branch_name):
         return res
 
 
+def has_git_editor_set():
+    command = ["git", "config", "--get", "core.editor"]
+    return run_command(command, 1)
+
+
 def commit(user_input):
     if not user_input.commit_message:
         for story_id in user_input.tracker_ids:
@@ -329,7 +333,10 @@ def commit(user_input):
             else:
                 user_input = DEFAULT_COMMIT_MESSAGE
 
-    command = ["git", "commit", "-m", user_input]
+    if has_git_editor_set():
+        command = ["git", "commit", "-e", "-m", str(user_input.commit_message)]
+    else:
+        command = ["git", "commit", "-m", str(user_input.commit_message)]
     res = run_command(command)
     if res:
         return "Failed to commit changes"
@@ -354,6 +361,21 @@ def find_existing_pr(owner, repo, head, base):
             return matching_pr_list[0]["html_url"]
 
 
+def read_pr_template():
+    pr_template_file_name = "PULL_REQUEST_TEMPLATE.md"
+    pr_template_path = ".github/" + pr_template_file_name
+
+    file_to_read = ""
+    if os.path.isfile(pr_template_path):
+        file_to_read = pr_template_path
+    elif os.path.isfile(pr_template_file_name):
+        file_to_read = pr_template_file_name
+
+    if file_to_read:
+        with open(file_to_read, mode='r') as f:
+            return f.read()
+
+
 def create_pull_request(from_branch, to_branch, user_input):
     if local_only_is_on:
         return NO_ERROR
@@ -374,6 +396,11 @@ def create_pull_request(from_branch, to_branch, user_input):
         if "name" in story:
             name = story["name"]
         pr_body = pr_body + "\n\n**Story:** [" + name + "](" + user_input.tracker_urls[i] + ")\n" + description
+
+    pr_template = read_pr_template()
+    if pr_template:
+        log("Reading from PR-Template")
+        pr_body = pr_body + "\n" + pr_template
 
     setup_config_dic = read_from_setup_file()
     owner = setup_config_dic["owner"]
@@ -405,7 +432,7 @@ def create_pull_request(from_branch, to_branch, user_input):
                     if post_pivotal_comment(project_id, user_input.tracker_ids[i], "PR: " + pr_url):
                         print "error with pivotal, commenting pr link"
 
-                    if ask_user("Mark story with id="+user_input.tracker_ids[i]+" as finished?(y/n)"):
+                    if ask_user("Mark story with id=" + user_input.tracker_ids[i] + " as finished?(y/n)"):
                         if mark_pivotal_story_finished(project_id, user_input.tracker_ids[i]):
                             print "error with pivotal, marking story as finished"
         return NO_ERROR
@@ -456,6 +483,7 @@ def terminate_on_error(func, args):
     error = func(args)
     if error:
         return error
+
 
 def parse_commit_message(raw_commit_message):
     # re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
