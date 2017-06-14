@@ -8,5 +8,6 @@ setup(
     license='Apache License, Version 2.0',
     author='Kayvan Najafzadeh',
     author_email='kayvannj@gmail.com',
-    description='A tool to help creating PullRequests on Github easier and automate some of the steps'
+    description='A tool to help creating PullRequests on Github easier and automate some of the steps',
+    install_requires='requests'
 )
