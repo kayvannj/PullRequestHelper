@@ -6,7 +6,6 @@ import re
 import subprocess
 import sys
 
-
 SLACK_INTEGRATION_URL_KEY = "SLACK_INTEGRATION_URL"
 DEFAULT_PULL_REQUEST_BODY_KEY = "DEFAULT_PULL_REQUEST_BODY"
 DEFAULT_COMMIT_MESSAGE_KEY = "DEFAULT_COMMIT_MESSAGE"
@@ -214,7 +213,9 @@ def get_head(current_path=""):
     # read the head from git dir
     with open(get_repo_git_dir(current_path) + "/HEAD") as f:
         ref = f.read()
-        return ref.split("/")[-1].strip()
+        keyword = "refs/heads/"
+        i = ref.rfind(keyword)
+        return ref[i + len(keyword):].strip()
 
 
 def get_repo_git_dir(current_path=""):
