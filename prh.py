@@ -648,7 +648,7 @@ def main(args):
     if error:
         return error
 
-    error = verify_parent_in_origin(branch_origin)
+    error = verify_parent_in_origin(branch_parent if branch_parent else branch_origin)
     if error:
         return error
 
