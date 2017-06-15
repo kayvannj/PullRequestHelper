@@ -6,7 +6,6 @@ import re
 import subprocess
 import sys
 
-
 SLACK_INTEGRATION_URL_KEY = "SLACK_INTEGRATION_URL"
 DEFAULT_PULL_REQUEST_BODY_KEY = "DEFAULT_PULL_REQUEST_BODY"
 DEFAULT_COMMIT_MESSAGE_KEY = "DEFAULT_COMMIT_MESSAGE"
@@ -23,7 +22,7 @@ PRH_CONFIG_PATH = "config_file_path"
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -214,7 +213,9 @@ def get_head(current_path=""):
     # read the head from git dir
     with open(get_repo_git_dir(current_path) + "/HEAD") as f:
         ref = f.read()
-        return ref.split("/")[-1].strip()
+        keyword = "refs/heads/"
+        i = ref.rfind(keyword)
+        return ref[i + len(keyword):].strip()
 
 
 def get_repo_git_dir(current_path=""):
@@ -557,7 +558,7 @@ class UserInput:
         self.commit_message = commit_message
 
 
-def main(args):
+def parse_args(args):
     # there is a syntax error in arguments
     if not args:
         return False
@@ -629,7 +630,7 @@ def main(args):
                 cd(pair)
                 submodule_args = args
                 submodule_args["sub"] = 0
-                main(submodule_args)
+                parse_args(submodule_args)
 
     if args.message:
         commit_message, full_urls, story_ids = parse_commit_message(args.message, [], [])
@@ -647,7 +648,7 @@ def main(args):
     if error:
         return error
 
-    error = verify_parent_in_origin(branch_origin)
+    error = verify_parent_in_origin(branch_parent if branch_parent else branch_origin)
     if error:
         return error
 
@@ -868,7 +869,7 @@ def migrate_config_file(from_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py"
         os.remove(old_config_path)
 
 
-if __name__ == "__main__":
+def main():
     migrate_config_file()
 
     if REPO_PATH:
@@ -880,4 +881,8 @@ if __name__ == "__main__":
     if missing_global_config() or missing_local_config():
         setup()
 
-    sys.exit(main(parse_arguments()))
+    sys.exit(parse_args(parse_arguments()))
+
+
+if __name__ == "__main__":
+    main()

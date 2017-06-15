@@ -2,3 +2,7 @@
 prh_config.py
 *.pyc
 .prh
+.vscode/
+prhpackage.egg-info/
+build/
+setup.cfg
