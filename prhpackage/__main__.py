@@ -22,7 +22,7 @@ PRH_CONFIG_PATH = "config_file_path"
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
