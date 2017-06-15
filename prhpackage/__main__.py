@@ -558,7 +558,7 @@ class UserInput:
         self.commit_message = commit_message
 
 
-def main(args):
+def parse_args(args):
     # there is a syntax error in arguments
     if not args:
         return False
@@ -630,7 +630,7 @@ def main(args):
                 cd(pair)
                 submodule_args = args
                 submodule_args["sub"] = 0
-                main(submodule_args)
+                parse_args(submodule_args)
 
     if args.message:
         commit_message, full_urls, story_ids = parse_commit_message(args.message, [], [])
@@ -869,7 +869,7 @@ def migrate_config_file(from_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py"
         os.remove(old_config_path)
 
 
-if __name__ == "__main__":
+def main():
     migrate_config_file()
 
     if REPO_PATH:
@@ -881,4 +881,8 @@ if __name__ == "__main__":
     if missing_global_config() or missing_local_config():
         setup()
 
-    sys.exit(main(parse_arguments()))
+    sys.exit(parse_args(parse_arguments()))
+
+
+if __name__ == "__main__":
+    main()
