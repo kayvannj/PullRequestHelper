@@ -6,3 +6,4 @@ prh_config.py
 prhpackage.egg-info/
 build/
 setup.cfg
+prh.egg-info/
