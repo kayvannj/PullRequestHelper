@@ -22,7 +22,7 @@ PRH_CONFIG_PATH = "config_file_path"
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.3.1"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -873,9 +873,11 @@ def main():
     migrate_config_file()
 
     if REPO_PATH:
+        global repo_path
         repo_path = REPO_PATH
     else:
         # get current working dir
+        global repo_path
         repo_path = os.getcwd()
 
     if missing_global_config() or missing_local_config():
