@@ -78,9 +78,6 @@ def log(message):
 
 def get_pivotal_story(story_id):
     global story
-    if story:
-        return story
-
     api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
     resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
     story = resp.json()
@@ -391,7 +388,8 @@ def create_pull_request(from_branch, to_branch, user_input):
     # Add description of stories to the pr_body
     for i in range(len(user_input.tracker_urls)):
         story = get_pivotal_story(user_input.tracker_ids[i])
-        description = name = ""
+        description = ""
+        name = ""
         if "description" in story:
             description = story["description"]
         if "name" in story:
@@ -489,13 +487,17 @@ def terminate_on_error(func, args):
 def parse_commit_message(raw_commit_message):
     # re_search = re.search("http[s]?:\/\/.*pivotaltracker.*/(\d*)", commit_message)
     commit_message = raw_commit_message
-    re_res = re.findall("http[s]?:\/\/.*pivotaltracker.*\/(\d*)", commit_message)
+    # pattern = '(http[s]?:\\/\\/\\S*pivotaltracker\\S*\\/(\\d*))'
+    pattern = '(http[s]?:\/\/\S*pivotaltracker\S*\/(\d*))'
     # "https://www.pivotaltracker.com/story/show/140176051 https://www.pivotaltracker.com/story/show/139604723"
-    full_urls = story_ids = []
+    re_res = re.findall(pattern, commit_message)
+    # [('https://www.pivotaltracker.com/story/show/147161007', '147161007'), ('https://www.pivotaltracker.com/story/show/148102385', '148102385')]
+    full_urls = []
+    story_ids = []
     if re_res:
         for url in re_res:
-            full_urls += url[0]
-            story_ids += url[1]
+            full_urls += [url[0]]
+            story_ids += [url[1]]
             commit_message = commit_message.replace(url[0], "")
     return commit_message, full_urls, story_ids
     # if re_search:
@@ -508,22 +510,22 @@ def parse_commit_message(raw_commit_message):
     #     commit_message = commit_message.replace(full_url, "")
 
 
-def parse_commit_message(commit_message, full_urls, story_ids):
-    """
-    Parse the user entered commit message and extract any known urls from it
-    :param commit_message:
-    :param full_urls:
-    :param story_ids:
-    :return: (commit_message, full_urls, story_ids)
-    """
-    re_search = re.search("http[s]?:\/\/\S*pivotaltracker.com\S*\/(\d*)", commit_message)
-    if re_search:
-        full_urls += [re_search.group(0)]
-        story_ids += [re_search.group(1)]
-        commit_message = commit_message.replace(re_search.group(0), "")
-    else:
-        return commit_message, full_urls, story_ids
-    return parse_commit_message(commit_message, full_urls, story_ids)
+# def parse_commit_message(commit_message, full_urls, story_ids):
+#     """
+#     Parse the user entered commit message and extract any known urls from it
+#     :param commit_message:
+#     :param full_urls:
+#     :param story_ids:
+#     :return: (commit_message, full_urls, story_ids)
+#     """
+#     re_search = re.search("http[s]?:\/\/\S*pivotaltracker.com\S*\/(\d*)", commit_message)
+#     if re_search:
+#         full_urls += [re_search.group(0)]
+#         story_ids += [re_search.group(1)]
+#         commit_message = commit_message.replace(re_search.group(0), "")
+#     else:
+#         return commit_message, full_urls, story_ids
+#     return parse_commit_message(commit_message, full_urls, story_ids)
 
 
 def process_from_child(origin, new, add_all, just_pr, file_paths, user_input):
@@ -633,7 +635,7 @@ def parse_args(args):
                 parse_args(submodule_args)
 
     if args.message:
-        commit_message, full_urls, story_ids = parse_commit_message(args.message, [], [])
+        commit_message, full_urls, story_ids = parse_commit_message(args.message)
         user_input.tracker_urls = full_urls
         user_input.tracker_ids = story_ids
         user_input.commit_message = commit_message
@@ -872,12 +874,11 @@ def migrate_config_file(from_path=PRH_CONFIG_PATH + PRH_CONFIG_FILE_NAME + ".py"
 def main():
     migrate_config_file()
 
+    global repo_path
     if REPO_PATH:
-        global repo_path
         repo_path = REPO_PATH
     else:
         # get current working dir
-        global repo_path
         repo_path = os.getcwd()
 
     if missing_global_config() or missing_local_config():
