@@ -93,7 +93,7 @@ def storiesResponseToMarkdownText(arrayOfDicts_storyArray, arrayofStrings_ordere
                 value = dict_story[string_fieldName]
                 if isinstance(value, int):
                     value = str(value)
-                value = value.replace('\n'," ")
+                value = value.replace('\n', " ")
                 # encode = str(name_).encode("utf-8")
                 arrayOfStrings_currentStoryOrderedFieldValues.append(
                     value
@@ -217,6 +217,34 @@ def post_pivotal_comment(project_id, story_id, text):
     api = "{}/projects/{}/stories/{}/comments".format(pivotal_tracker_api_endpoint, project_id, story_id)
     resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).post(api, {"text": text})
     return resp.json()
+
+
+class ReleaseConfig:
+
+    def __init__(self, tag_name="", target_commitish="", name="", body="", draft=False, prerelease=False):
+        self.tag_name = tag_name
+        self.target_commitish = target_commitish
+        self.name = name
+        self.body = body
+        self.draft = draft
+        self.prerelease = prerelease
+
+
+# POST /repos/:owner/:repo/releases
+def post_github_release(owner, repo, release_config):
+    github = "https://api.github.com"
+    api = "{}/repos/{}/{}/releases".format(github, owner, repo)
+
+    data = {
+        "tag_name": release_config.tag_name,
+        "target_commitish": release_config.target_commitish,
+        "name": release_config.name,
+        "body": release_config.body,
+        "draft": release_config.draft,
+        "prerelease": release_config.prerelease
+    }
+    res = github_api_post(api, data)
+    return res
 
 
 def get_pivotal_project_id(story_id):
@@ -648,21 +676,24 @@ class UserInput:
         self.commit_message = commit_message
 
 
-def release(release_story_id):
+def release(release_story_id, owner, repo, tag_name):
     if not release_story_id:
         print("Have to provide a pivotal tracker label for this release")
         return
 
-    # https: // www.pivotaltracker.com / story / show / 154690215
     release_story = get_pivotal_story(release_story_id)
     release_labels = [l["name"] for l in release_story["labels"]]
     release_name = release_story["name"]
     release_project_id = release_story["project_id"]
 
-    #     fetch all the storis with given label
-    columns = ["id","name", "description", "story_type", "url"]
+    #     fetch all the stories with given label
+    columns = ["id", "name", "description", "story_type", "url"]
     stories = get_pivotal_stories(release_project_id, release_labels, columns)
-    print storiesResponseToMarkdownText(stories, columns)
+    release_body = storiesResponseToMarkdownText(stories, columns)
+
+    post_github_release(owner, repo,
+                        ReleaseConfig(tag_name=tag_name, target_commitish="master", name="v%s" % release_name,
+                                      body=release_body))
 
 
 def parse_args(args):
@@ -672,8 +703,12 @@ def parse_args(args):
 
     if args.release:
         re_res = re.findall("http[s]?:\/\/.*pivotaltracker.*\/(\d*)", args.release)
-        release(re_res[0])
-        return
+
+        if args.tag and args.repo and args.owner:
+            release(re_res[0], owner=args.owner, repo=args.repo, tag_name=args.tag)
+        else:
+            print("parameter is missing, have to provide all of: owner, repo, tag")
+        return False
 
     file_paths = []
     branch_child = branch_parent = pr_title = pr_body = is_add_all = is_just_pr = commit_message = ""
@@ -927,9 +962,15 @@ def parse_arguments():
                         const=True, nargs='?')
     parser.add_argument("setup", help="Setup the pull-request helper", const=True, nargs='?')
     parser.add_argument("release",
-                        help="pivotal tracker label for the stories you want to include in the release table to make a release PR",
+                        help="URL of the release story on Pivotal tracker that has matching label to all the stories "
+                             "in that release. For example, the release story might have '1.2.3' as a label, then all "
+                             "the stories that come up from searching the '1.2.3' lable will be included in the "
+                             "release",
                         const=True, nargs='?')
     parser.add_argument("-p", "--path")
+    parser.add_argument("--owner", help="Repository owner. ex: for doximity/android the owner is doximity")
+    parser.add_argument("--repo", help="Repository name. ex: for doximity/android the owner is android")
+    parser.add_argument("--tag", help="tag name for the release")
 
     args = parser.parse_args()
 
