@@ -5,6 +5,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib
+import json
 
 SLACK_INTEGRATION_URL_KEY = "SLACK_INTEGRATION_URL"
 DEFAULT_PULL_REQUEST_BODY_KEY = "DEFAULT_PULL_REQUEST_BODY"
@@ -15,20 +17,20 @@ EMPTY_CONFIG_CONTENT_DIC = {GITHUB_API_TOKEN_KEY: "", PIVOTAL_API_TOKEN_KEY: "",
                             DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
                             SLACK_INTEGRATION_URL_KEY: ""}
 
-REPO_PATH = ""  # for debug purposes
-# PRH_CONFIG_PATH = "/usr/local/etc"
-PRH_CONFIG_PATH = "config_file_path"
+REPO_PATH = "/Users/kayvan/Developer/android"  # for debug purposes
+PRH_CONFIG_PATH = "/usr/local/etc"
+# PRH_CONFIG_PATH = "config_file_path"
 
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.3.1"
+APP_VERSION = "2.4.0"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
 NO_ERROR = 0
-debug_is_on = 0
-verbose_is_on = 0
+debug_is_on = 1
+verbose_is_on = 1
 local_only_is_on = 0
 stay_is_on = 0
 is_in_submodule = 0
@@ -71,20 +73,108 @@ class Service:
             print message
 
 
+def storiesResponseToMarkdownText(arrayOfDicts_storyArray, arrayofStrings_orderedFieldNames):
+    # Treating each dictionary in our json array as representing a story,
+    # gather all of the stories' relevant values
+    arrayOfArrayOfString_allStories = []
+
+    # Find each story's relevant values and add them to `allStories`
+    for dict_story in arrayOfDicts_storyArray:
+        # initialize empty values array
+        arrayOfStrings_currentStoryOrderedFieldValues = []
+
+        ## add all values we care about to the field values array
+        for string_fieldName in arrayofStrings_orderedFieldNames:
+
+            # if this story json has a value corresponding to `fieldName`,
+            # add that value to `currentStoryOrderedFieldValues`.
+            if string_fieldName in dict_story:
+
+                value = dict_story[string_fieldName]
+                if isinstance(value, int):
+                    value = str(value)
+                value = value.replace('\n', " ")
+                # encode = str(name_).encode("utf-8")
+                arrayOfStrings_currentStoryOrderedFieldValues.append(
+                    value
+                )
+            # otherwise, add an empty string to `currentStoryOrderedFieldValues`.
+            else:
+                arrayOfStrings_currentStoryOrderedFieldValues.append("")
+
+        # add the current story's field relevant values to `allStories` array
+        arrayOfArrayOfString_allStories.append(arrayOfStrings_currentStoryOrderedFieldValues)
+
+    # construct the markdown table given our column names and our rows:
+    return composeMarkdownTable(arrayofStrings_orderedFieldNames, arrayOfArrayOfString_allStories)
+
+
+# Given the column names, and the rows (array of string arrays),
+# constructs a string representing a markdown table.
+def composeMarkdownTable(arrayOfStrings_columnNames, arrayOfArrayOfString_rows):
+    arrayOfArrayOfString_markdownTable = []
+
+    # add column names to the table
+    arrayOfArrayOfString_markdownTable.append(
+        stringArrayToMarkdownTableRow(arrayOfStrings_columnNames)
+    )
+
+    # add post-column separators to the table
+    arrayOfArrayOfString_markdownTable.append(
+        stringArrayToMarkdownTableRow(
+            ["--"] * len(arrayOfStrings_columnNames)
+        )
+    )
+
+    # add the actual rows
+    for arrayOfString_row in arrayOfArrayOfString_rows:
+        arrayOfArrayOfString_markdownTable.append(
+            stringArrayToMarkdownTableRow(arrayOfString_row)
+        )
+
+    return "\n".join(arrayOfArrayOfString_markdownTable)
+
+
+# A markdown table row is a single unbroken string,
+# where each column is separated by a " | " string.
+def stringArrayToMarkdownTableRow(stringArray):
+    string_separatorString = " | "
+    return string_separatorString.join(stringArray)
+
+
 def log(message):
     if verbose_is_on:
         print message
 
 
 def get_pivotal_story(story_id):
-    global story
-    if story:
-        return story
-
     api = "{}/stories/{}".format(pivotal_tracker_api_endpoint, story_id)
     resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
     story = resp.json()
     return story
+
+
+# /projects/{project_id}/labels/{label_id}
+def get_pivotal_label_name(project_id, label_id):
+    api = "{}/projects/{project_id}/labels/{label_id}".format(pivotal_tracker_api_endpoint, project_id, label_id)
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
+    story = resp.json()
+    return story["name"]
+
+
+def get_pivotal_stories(project_id, labels, columns):
+    global story
+    if story:
+        return story
+
+    filter_string = " and ".join(["label:{}".format(l) for l in labels])
+
+    urlencode = urllib.urlencode(
+        {'filter': filter_string, 'fields': ",".join(columns)})
+    api = "{}/projects/{}/stories?{}".format(pivotal_tracker_api_endpoint, project_id, urlencode)
+    resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).get(api)
+
+    return resp.json()
 
 
 def get_pivotal_story_tasks(project_id, story_id):
@@ -127,6 +217,34 @@ def post_pivotal_comment(project_id, story_id, text):
     api = "{}/projects/{}/stories/{}/comments".format(pivotal_tracker_api_endpoint, project_id, story_id)
     resp = Service(read_from_config_file()[PIVOTAL_API_TOKEN_KEY]).post(api, {"text": text})
     return resp.json()
+
+
+class ReleaseConfig:
+
+    def __init__(self, tag_name="", target_commitish="", name="", body="", draft=False, prerelease=False):
+        self.tag_name = tag_name
+        self.target_commitish = target_commitish
+        self.name = name
+        self.body = body
+        self.draft = draft
+        self.prerelease = prerelease
+
+
+# POST /repos/:owner/:repo/releases
+def post_github_release(owner, repo, release_config):
+    github = "https://api.github.com"
+    api = "{}/repos/{}/{}/releases".format(github, owner, repo)
+
+    data = {
+        "tag_name": release_config.tag_name,
+        "target_commitish": release_config.target_commitish,
+        "name": release_config.name,
+        "body": release_config.body,
+        "draft": release_config.draft,
+        "prerelease": release_config.prerelease
+    }
+    res = github_api_post(api, data)
+    return res
 
 
 def get_pivotal_project_id(story_id):
@@ -425,8 +543,6 @@ def create_pull_request(from_branch, to_branch, user_input):
         pr_url = res.json()["html_url"]
         print "PR created: {}".format(pr_url)
         if pr_url and str(pr_url)[:4] == "http":
-            launch_browser(pr_url)
-
             for i in range(len(user_input.tracker_ids)):
                 if user_input.tracker_ids[i]:
                     project_id = get_pivotal_project_id(user_input.tracker_ids[i])
@@ -436,6 +552,7 @@ def create_pull_request(from_branch, to_branch, user_input):
                     if ask_user("Mark story with id=" + user_input.tracker_ids[i] + " as finished?(y/n)"):
                         if mark_pivotal_story_finished(project_id, user_input.tracker_ids[i]):
                             print "error with pivotal, marking story as finished"
+            launch_browser(pr_url)
         return NO_ERROR
     else:
         existing_pr_url = find_existing_pr(owner, repo, from_branch, to_branch)
@@ -476,8 +593,9 @@ def verify_file_paths(file_paths):
 
 def verify_parent_in_origin(origin):
     if not os.path.exists(get_repo_git_dir() + "/refs/remotes/origin/%s" % origin):
-        print "Push the parent branch '%s' to origin before using PRH" % origin
-        return 1
+        print "could not find the parent branch '%s' in your local remote refs, in case of error, make sure you have " \
+              "pushed the parent branch" % origin
+        return 0
 
 
 def terminate_on_error(func, args):
@@ -558,10 +676,40 @@ class UserInput:
         self.commit_message = commit_message
 
 
+def release(release_story_id, owner, repo, tag_name):
+    if not release_story_id:
+        print("Have to provide a pivotal tracker label for this release")
+        return
+
+    release_story = get_pivotal_story(release_story_id)
+    release_labels = [l["name"] for l in release_story["labels"]]
+    release_name = release_story["name"]
+    release_project_id = release_story["project_id"]
+
+    #     fetch all the stories with given label
+    columns = ["id", "name", "description", "story_type", "url"]
+    stories = get_pivotal_stories(release_project_id, release_labels, columns)
+    release_body = storiesResponseToMarkdownText(stories, columns)
+
+    post_github_release(owner, repo,
+                        ReleaseConfig(tag_name=tag_name, target_commitish="master", name="v%s" % release_name,
+                                      body=release_body))
+
+
 def parse_args(args):
     # there is a syntax error in arguments
     if not args:
         return False
+
+    if args.release:
+        re_res = re.findall("http[s]?:\/\/.*pivotaltracker.*\/(\d*)", args.release)
+
+        if args.tag and args.repo and args.owner:
+            release(re_res[0], owner=args.owner, repo=args.repo, tag_name=args.tag)
+        else:
+            print("parameter is missing, have to provide all of: owner, repo, tag")
+        return False
+
     file_paths = []
     branch_child = branch_parent = pr_title = pr_body = is_add_all = is_just_pr = commit_message = ""
     need_to_confirm_empty = need_to_confirm_add_all = ""
@@ -813,7 +961,16 @@ def parse_arguments():
                         help="Do not push any changes or create a PR, only create the branch and make the commit",
                         const=True, nargs='?')
     parser.add_argument("setup", help="Setup the pull-request helper", const=True, nargs='?')
+    parser.add_argument("release",
+                        help="URL of the release story on Pivotal tracker that has matching label to all the stories "
+                             "in that release. For example, the release story might have '1.2.3' as a label, then all "
+                             "the stories that come up from searching the '1.2.3' lable will be included in the "
+                             "release",
+                        const=True, nargs='?')
     parser.add_argument("-p", "--path")
+    parser.add_argument("--owner", help="Repository owner. ex: for doximity/android the owner is doximity")
+    parser.add_argument("--repo", help="Repository name. ex: for doximity/android the owner is android")
+    parser.add_argument("--tag", help="tag name for the release")
 
     args = parser.parse_args()
 
@@ -877,7 +1034,7 @@ def main():
         repo_path = REPO_PATH
     else:
         # get current working dir
-        global repo_path
+        # global repo_path
         repo_path = os.getcwd()
 
     if missing_global_config() or missing_local_config():
