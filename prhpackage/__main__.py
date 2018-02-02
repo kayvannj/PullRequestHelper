@@ -515,8 +515,6 @@ def create_pull_request(from_branch, to_branch, user_input):
         pr_url = res.json()["html_url"]
         print "PR created: {}".format(pr_url)
         if pr_url and str(pr_url)[:4] == "http":
-            launch_browser(pr_url)
-
             for i in range(len(user_input.tracker_ids)):
                 if user_input.tracker_ids[i]:
                     project_id = get_pivotal_project_id(user_input.tracker_ids[i])
@@ -526,6 +524,7 @@ def create_pull_request(from_branch, to_branch, user_input):
                     if ask_user("Mark story with id=" + user_input.tracker_ids[i] + " as finished?(y/n)"):
                         if mark_pivotal_story_finished(project_id, user_input.tracker_ids[i]):
                             print "error with pivotal, marking story as finished"
+            launch_browser(pr_url)
         return NO_ERROR
     else:
         existing_pr_url = find_existing_pr(owner, repo, from_branch, to_branch)
