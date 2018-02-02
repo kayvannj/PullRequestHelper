@@ -17,14 +17,14 @@ EMPTY_CONFIG_CONTENT_DIC = {GITHUB_API_TOKEN_KEY: "", PIVOTAL_API_TOKEN_KEY: "",
                             DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
                             SLACK_INTEGRATION_URL_KEY: ""}
 
-# REPO_PATH = "/Users/kayvan/Developer/android"  # for debug purposes
+REPO_PATH = "" # for debug purposes
 # PRH_CONFIG_PATH = "/usr/local/etc"
 PRH_CONFIG_PATH = "config_file_path"
 
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
 GIT_FILE_PATH = ".git"
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.4.1"
 
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
@@ -704,8 +704,12 @@ def parse_args(args):
     if args.release:
         re_res = re.findall("http[s]?:\/\/.*pivotaltracker.*\/(\d*)", args.release)
 
-        if args.tag and args.repo and args.owner:
-            release(re_res[0], owner=args.owner, repo=args.repo, tag_name=args.tag)
+        setup_config_dic = read_from_setup_file()
+        owner = setup_config_dic["owner"]
+        repo = setup_config_dic["repo"]
+
+        if args.tag and (args.repo or repo) and (args.owner or owner):
+            release(re_res[0], owner=(args.owner or owner), repo=(args.repo or repo), tag_name=args.tag)
         else:
             print("parameter is missing, have to provide all of: owner, repo, tag")
         return False
