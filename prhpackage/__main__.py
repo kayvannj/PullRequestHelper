@@ -566,8 +566,9 @@ def verify_file_paths(file_paths):
 
 def verify_parent_in_origin(origin):
     if not os.path.exists(get_repo_git_dir() + "/refs/remotes/origin/%s" % origin):
-        print "Push the parent branch '%s' to origin before using PRH" % origin
-        return 1
+        print "could not find the parent branch '%s' in your local remote refs, in case of error, make sure you have " \
+              "pushed the parent branch" % origin
+        return 0
 
 
 def terminate_on_error(func, args):
