@@ -17,9 +17,9 @@ EMPTY_CONFIG_CONTENT_DIC = {GITHUB_API_TOKEN_KEY: "", PIVOTAL_API_TOKEN_KEY: "",
                             DEFAULT_COMMIT_MESSAGE_KEY: "Commit", DEFAULT_PULL_REQUEST_BODY_KEY: "",
                             SLACK_INTEGRATION_URL_KEY: ""}
 
-REPO_PATH = "/Users/kayvan/Developer/android"  # for debug purposes
-PRH_CONFIG_PATH = "/usr/local/etc"
-# PRH_CONFIG_PATH = "config_file_path"
+# REPO_PATH = "/Users/kayvan/Developer/android"  # for debug purposes
+# PRH_CONFIG_PATH = "/usr/local/etc"
+PRH_CONFIG_PATH = "config_file_path"
 
 PRH_CONFIG_FILE_NAME = "/prh_config"
 GIT_CONFIG_PATH = "/config"
@@ -29,8 +29,8 @@ APP_VERSION = "2.4.0"
 DEFAULT_COMMIT_MESSAGE = ""  # prh_config.DEFAULT_COMMIT_MESSAGE
 DEFAULT_PR_BODY = ""  # prh_config.DEFAULT_PULL_REQUEST_BODY
 NO_ERROR = 0
-debug_is_on = 1
-verbose_is_on = 1
+debug_is_on = 0
+verbose_is_on = 0
 local_only_is_on = 0
 stay_is_on = 0
 is_in_submodule = 0
